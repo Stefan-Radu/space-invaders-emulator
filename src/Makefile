@@ -1,6 +1,6 @@
 BINARY=siemu
 INCDIRS=.
-CODEDIRS=. lib
+CODEDIRS=.
 
 CC=gcc
 OPT=-O0
@@ -22,8 +22,9 @@ all: $(BINARY)
 $(BINARY): $(OBJECTS)
 	$(CC) -o $@ $^
 
+# only want the .c file dependency here, thus $< instead of $^.
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) -o $@ $(CFLAGS) -c $<
 
 clean:
 	rm -rf $(OBJECTS) $(DEPFILES)
