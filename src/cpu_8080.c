@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdio.h>
+
 #include "cpu_8080.h"
+#include "opcodes.h"
 
 
 uint16_t stack_pointer;
@@ -41,12 +43,7 @@ typedef union {
     };
 } registers;
 
-typedef struct {
-    const char *name;
-    uint8_t length;
-    uint8_t  t_duration;
-    uint8_t  n_duration;
-} instruction;
+static registers regs;
 
 // ============ INSTRUCTIONS ============
 //
@@ -55,97 +52,26 @@ typedef struct {
 // TODO think of how to implement instructions
 // TODO lazy flag evaluation
 
-#define NOP
+/*#define NOP*/
 
-// 8-bit transfers
-#define STAX(reg_dst, reg_src) (store(registers.reg_dst, reg_src))
+/*// 8-bit transfers*/
+/*#define STAX(reg_dst, reg_src) (store(registers.reg_dst, reg_src))*/
 
-// 16-bit transfers
-#define LXI(reg, val) (registers.(reg) = val)
+/*// 16-bit transfers*/
+/*#define LXI(reg, val) (registers.(reg) = val)*/
 
-// 8-bit arithmetic
-#define INR(reg) registers.(reg) += 1\
-                if (registers.(reg) == 0) registers.zf = 1; \
-                if (registers.(reg) == 0) registers.cf = 1; \
-                if (registers.(reg) & (1 << 7)) registers.sf = 1; \
-                if (
+/*// 8-bit arithmetic*/
+/*#define INR(reg) registers.(reg) += 1\*/
+                /*if (registers.(reg) == 0) registers.zf = 1; \*/
+                /*if (registers.(reg) == 0) registers.cf = 1; \*/
+                /*if (registers.(reg) & (1 << 7)) registers.sf = 1; \*/
+                /*if (*/
             
 
 
-// 16-bit arithmetic
-#define INX(reg) (registers.(reg) += 1)
+/*// 16-bit arithmetic*/
+/*#define INX(reg) (registers.(reg) += 1)*/
 
-//
-// ============ INSTRUCTIONS ============
-
-instruction instructions[16][16] = {
-    {{"nop", 1, 4, 0}, {"lxi b,d16", 3, 10, 0}, {"stax b", 1, 7, 0}, {"inx b", 1, 5, 0},
-     {"inr b", 1, 5, 0}, {"dcr b", 1, 5, 0}, {"mvi b,d8", 2, 7, 0}, {"rlc", 1, 4, 0},
-     {"nop", 1, 4, 0}, {"dad b", 1, 10, 0}, {"lxax b", 1, 7, 0}, {"dcx b", 1, 5, 0},
-     {"inr c", 1, 5, 0}, {"dcr c", 1, 5, 0}, {"mvi c, d8", 2, 7, 0}, {"rrc", 1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}},
-    {{"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0},
-     {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}, {"nop", -1, -1, 0}}
-};
-
-static registers regs;
 
 static void test_set_registers() {
 }
@@ -165,4 +91,3 @@ void print_registers() {
     printf("D: %hx\n", regs.DE);
     printf("H: %hx\n", regs.HL);
 }
-
