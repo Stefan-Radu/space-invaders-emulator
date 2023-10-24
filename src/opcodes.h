@@ -3,18 +3,9 @@
 
 #include <stdint.h>
 
-typedef enum opcode_type {
-    OP_NOP = 0, 
-    OP_TRANSFER_8,
-    OP_TRANSFER_16,
-    OP_ARITHM_8,
-    OP_ARITHM_16,
-    OP_JMP,
-    OP_CALL,
-    OP_RET,
-    OP_ROT,
-    OP_MISC,
-} opcode_t;
+// TODO combine this and cpu.h
+
+#include "cpu_8080.h"
 
 #define EACH_OP_CODE(_) \
     _(NOP) _(LXI_B_D16) _(STAX_B) _(INX_B) _(INR_B) _(DCR_B) _(MVI_B_D8) _(RLC) \
@@ -66,16 +57,17 @@ const char* opcode_str[OP_CODES_CNT] {
 #undef AS_STRING_COMMA
 #undef AS_BARE_NAME_COMMA
 
-
 typedef struct {
     uint8_t  length;
     uint8_t  t_duration;
     uint8_t  n_duration;
-    opcode_t op_type;
+    void (*op_code_action)(void);
 } op_code_detail;
 
+// TODO modify action in parallel with implementation
+
 op_code_detail op_code_details[OP_CODES_CNT] = {
-    {1,  4, 0, OP_NOP},  // NOP
+    {1,  4, 0, nop},  // NOP
     {3, 10, 0, OP_MISC}, // LXI_B_D16
     {1,  7, 0, OP_MISC}, // STAX_B
     {1,  5, 0, OP_MISC}, // INX_B
@@ -83,7 +75,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_B
     {2,  7, 0, OP_MISC}, // MVI_B_D8
     {1,  4, 0, OP_MISC}, // RLC
-    {1,  4, 0, OP_NOP},  // NOP_DUP_0
+    {1,  4, 0, nop},  // NOP_DUP_0
     {1, 10, 0, OP_MISC}, // DAD_B
     {1,  7, 0, OP_MISC}, // LDAX_B
     {1,  5, 0, OP_MISC}, // DCX_B
@@ -91,7 +83,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_C
     {2,  7, 0, OP_MISC}, // MVI_C_D8
     {1,  4, 0, OP_MISC}, // RRC
-    {1,  4, 0, OP_NOP},  // NOP_DUP_1
+    {1,  4, 0, nop},  // NOP_DUP_1
     {3, 10, 0, OP_MISC}, // LXI_D_D16
     {1,  7, 0, OP_MISC}, // STAX_D
     {1,  5, 0, OP_MISC}, // INX_D
@@ -99,7 +91,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_D
     {2,  7, 0, OP_MISC}, // MVI_D
     {1,  4, 0, OP_MISC}, // RAL
-    {1,  4, 0, OP_NOP},  // NOP_DUP_2
+    {1,  4, 0, nop},  // NOP_DUP_2
     {1, 10, 0, OP_MISC}, // DAD_D
     {1,  7, 0, OP_MISC}, // LDAX_D
     {1,  5, 0, OP_MISC}, // DCX_D
@@ -107,7 +99,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_E
     {2,  7, 0, OP_MISC}, // MVI_E_D8
     {1,  4, 0, OP_MISC}, // RAR
-    {1,  4, 0, OP_NOP},  // NOP_DUP_3
+    {1,  4, 0, nop},  // NOP_DUP_3
     {3, 10, 0, OP_MISC}, // LXI_H_D16
     {3, 16, 0, OP_MISC}, // SHLD_A16
     {1,  5, 0, OP_MISC}, // INX_H
@@ -115,7 +107,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_H
     {2,  7, 0, OP_MISC}, // MVI_H_D8
     {1,  4, 0, OP_MISC}, // DAA
-    {1,  4, 0, OP_NOP},  // NOP_DUP_4
+    {1,  4, 0, nop},  // NOP_DUP_4
     {1, 10, 0, OP_MISC}, // DAD_H
     {3, 16, 0, OP_MISC}, // LHLD_A16
     {1,  5, 0, OP_MISC}, // DCX_H
@@ -123,7 +115,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_L
     {2,  7, 0, OP_MISC}, // MVI_L_D8
     {1,  4, 0, OP_MISC}, // CMA
-    {1,  4, 0, OP_NOP},  // NOP_DUP_5
+    {1,  4, 0, nop},  // NOP_DUP_5
     {3, 10, 0, OP_MISC}, // LXI_SP_D16
     {3, 13, 0, OP_MISC}, // STA_A16
     {1,  5, 0, OP_MISC}, // INX_SP
@@ -131,7 +123,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 10, 0, OP_MISC}, // DCR_M
     {2, 10, 0, OP_MISC}, // MVI_M_D8
     {1,  4, 0, OP_MISC}, // STC
-    {1,  4, 0, OP_NOP},  // NOP_DUP_6
+    {1,  4, 0, nop},  // NOP_DUP_6
     {1, 10, 0, OP_MISC}, // DAD_SP
     {3, 13, 0, OP_MISC}, // LDA_A16
     {1,  5, 0, OP_MISC}, // DCX_SP
@@ -139,70 +131,70 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCR_A
     {2,  7, 0, OP_MISC}, // MVI_A_D8
     {1,  4, 0, OP_MISC}, // CMC
-    {1,  5, 0, OP_MISC}, // MOV_B_B
-    {1,  5, 0, OP_MISC}, // MOV_B_C
-    {1,  5, 0, OP_MISC}, // MOV_B_D
-    {1,  5, 0, OP_MISC}, // MOV_B_E
-    {1,  5, 0, OP_MISC}, // MOV_B_H
-    {1,  5, 0, OP_MISC}, // MOV_B_L
-    {1,  7, 0, OP_MISC}, // MOV_B_M
-    {1,  5, 0, OP_MISC}, // MOV_B_A
-    {1,  5, 0, OP_MISC}, // MOV_C_B
-    {1,  5, 0, OP_MISC}, // MOV_C_C
-    {1,  5, 0, OP_MISC}, // MOV_C_D
-    {1,  5, 0, OP_MISC}, // MOV_C_E
-    {1,  5, 0, OP_MISC}, // MOV_C_H
-    {1,  5, 0, OP_MISC}, // MOV_C_L
-    {1,  7, 0, OP_MISC}, // MOV_C_M
-    {1,  5, 0, OP_MISC}, // MOV_C_A
-    {1,  5, 0, OP_MISC}, // MOV_D_B
-    {1,  5, 0, OP_MISC}, // MOV_D_C
-    {1,  5, 0, OP_MISC}, // MOV_D_D
-    {1,  5, 0, OP_MISC}, // MOV_D_E
-    {1,  5, 0, OP_MISC}, // MOV_D_H
-    {1,  5, 0, OP_MISC}, // MOV_D_L
-    {1,  7, 0, OP_MISC}, // MOV_D_M
-    {1,  5, 0, OP_MISC}, // MOV_D_A
-    {1,  5, 0, OP_MISC}, // MOV_E_B
-    {1,  5, 0, OP_MISC}, // MOV_E_C
-    {1,  5, 0, OP_MISC}, // MOV_E_D
-    {1,  5, 0, OP_MISC}, // MOV_E_E
-    {1,  5, 0, OP_MISC}, // MOV_E_H
-    {1,  5, 0, OP_MISC}, // MOV_E_L
-    {1,  7, 0, OP_MISC}, // MOV_E_M
-    {1,  5, 0, OP_MISC}, // MOV_E_A
-    {1,  5, 0, OP_MISC}, // MOV_H_B
-    {1,  5, 0, OP_MISC}, // MOV_H_C
-    {1,  5, 0, OP_MISC}, // MOV_H_D
-    {1,  5, 0, OP_MISC}, // MOV_H_E
-    {1,  5, 0, OP_MISC}, // MOV_H_H
-    {1,  5, 0, OP_MISC}, // MOV_H_L
-    {1,  7, 0, OP_MISC}, // MOV_H_M
-    {1,  5, 0, OP_MISC}, // MOV_H_A
-    {1,  5, 0, OP_MISC}, // MOV_L_B
-    {1,  5, 0, OP_MISC}, // MOV_L_C
-    {1,  5, 0, OP_MISC}, // MOV_L_D
-    {1,  5, 0, OP_MISC}, // MOV_L_E
-    {1,  5, 0, OP_MISC}, // MOV_L_H
-    {1,  5, 0, OP_MISC}, // MOV_L_L
-    {1,  7, 0, OP_MISC}, // MOV_L_M
-    {1,  5, 0, OP_MISC}, // MOV_L_A
-    {1,  7, 0, OP_MISC}, // MOV_M_B
-    {1,  7, 0, OP_MISC}, // MOV_M_C
-    {1,  7, 0, OP_MISC}, // MOV_M_D
-    {1,  7, 0, OP_MISC}, // MOV_M_E
-    {1,  7, 0, OP_MISC}, // MOV_M_H
-    {1,  7, 0, OP_MISC}, // MOV_M_L
+    {1,  5, 0, mov_b_b}, // MOV_B_B
+    {1,  5, 0, mov_b_c}, // MOV_B_C
+    {1,  5, 0, mov_b_d}, // MOV_B_D
+    {1,  5, 0, mov_b_e}, // MOV_B_E
+    {1,  5, 0, mov_b_h}, // MOV_B_H
+    {1,  5, 0, mov_b_l}, // MOV_B_L
+    {1,  7, 0, mov_b_m}, // MOV_B_M
+    {1,  5, 0, mov_b_a}, // MOV_B_A
+    {1,  5, 0, mov_c_b}, // MOV_C_B
+    {1,  5, 0, mov_c_c}, // MOV_C_C
+    {1,  5, 0, mov_c_d}, // MOV_C_D
+    {1,  5, 0, mov_c_e}, // MOV_C_E
+    {1,  5, 0, mov_c_h}, // MOV_C_H
+    {1,  5, 0, mov_c_l}, // MOV_C_L
+    {1,  7, 0, mov_c_m}, // MOV_C_M
+    {1,  5, 0, mov_c_a}, // MOV_C_A
+    {1,  5, 0, mov_d_b}, // MOV_D_B
+    {1,  5, 0, mov_d_c}, // MOV_D_C
+    {1,  5, 0, mov_d_d}, // MOV_D_D
+    {1,  5, 0, mov_d_e}, // MOV_D_E
+    {1,  5, 0, mov_d_h}, // MOV_D_H
+    {1,  5, 0, mov_d_l}, // MOV_D_L
+    {1,  7, 0, mov_d_m}, // MOV_D_M
+    {1,  5, 0, mov_d_a}, // MOV_D_A
+    {1,  5, 0, mov_e_b}, // MOV_E_B
+    {1,  5, 0, mov_e_c}, // MOV_E_C
+    {1,  5, 0, mov_e_d}, // MOV_E_D
+    {1,  5, 0, mov_e_e}, // MOV_E_E
+    {1,  5, 0, mov_e_h}, // MOV_E_H
+    {1,  5, 0, mov_e_l}, // MOV_E_L
+    {1,  7, 0, mov_e_m}, // MOV_E_M
+    {1,  5, 0, mov_e_a}, // MOV_E_A
+    {1,  5, 0, mov_h_b}, // MOV_H_B
+    {1,  5, 0, mov_h_c}, // MOV_H_C
+    {1,  5, 0, mov_h_d}, // MOV_H_D
+    {1,  5, 0, mov_h_e}, // MOV_H_E
+    {1,  5, 0, mov_h_h}, // MOV_H_H
+    {1,  5, 0, mov_h_l}, // MOV_H_L
+    {1,  7, 0, mov_h_m}, // MOV_H_M
+    {1,  5, 0, mov_h_a}, // MOV_H_A
+    {1,  5, 0, mov_l_b}, // MOV_L_B
+    {1,  5, 0, mov_l_c}, // MOV_L_C
+    {1,  5, 0, mov_l_d}, // MOV_L_D
+    {1,  5, 0, mov_l_e}, // MOV_L_E
+    {1,  5, 0, mov_l_h}, // MOV_L_H
+    {1,  5, 0, mov_l_l}, // MOV_L_L
+    {1,  7, 0, mov_l_m}, // MOV_L_M
+    {1,  5, 0, mov_l_a}, // MOV_L_A
+    {1,  7, 0, mov_m_b}, // MOV_M_B
+    {1,  7, 0, mov_m_c}, // MOV_M_C
+    {1,  7, 0, mov_m_d}, // MOV_M_D
+    {1,  7, 0, mov_m_e}, // MOV_M_E
+    {1,  7, 0, mov_m_h}, // MOV_M_H
+    {1,  7, 0, mov_m_l}, // MOV_M_L
     {1,  7, 0, OP_MISC}, // HLT
-    {1,  7, 0, OP_MISC}, // MOV_M_A
-    {1,  5, 0, OP_MISC}, // MOV_A_B
-    {1,  5, 0, OP_MISC}, // MOV_A_C
-    {1,  5, 0, OP_MISC}, // MOV_A_D
-    {1,  5, 0, OP_MISC}, // MOV_A_E
-    {1,  5, 0, OP_MISC}, // MOV_A_H
-    {1,  5, 0, OP_MISC}, // MOV_A_L
-    {1,  7, 0, OP_MISC}, // MOV_A_M
-    {1,  5, 0, OP_MISC}, // MOV_A_A
+    {1,  7, 0, mov_m_a}, // MOV_M_A
+    {1,  5, 0, mov_a_b}, // MOV_A_B
+    {1,  5, 0, mov_a_c}, // MOV_A_C
+    {1,  5, 0, mov_a_d}, // MOV_A_D
+    {1,  5, 0, mov_a_e}, // MOV_A_E
+    {1,  5, 0, mov_a_h}, // MOV_A_H
+    {1,  5, 0, mov_a_l}, // MOV_A_L
+    {1,  7, 0, mov_a_m}, // MOV_A_M
+    {1,  5, 0, mov_a_a}, // MOV_A_A
     {1,  4, 0, OP_MISC}, // ADD_B
     {1,  4, 0, OP_MISC}, // ADD_C
     {1,  4, 0, OP_MISC}, // ADD_D
