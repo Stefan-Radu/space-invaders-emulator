@@ -8,6 +8,9 @@ uint8_t  memory[0x10000];
 uint16_t stack_pointer;
 uint16_t program_counter;
 
+typedef uint8_t  reg_t;
+typedef uint16_t w_reg_t;
+
 // assuming little endian
 typedef union {
     struct { 
@@ -30,16 +33,16 @@ typedef union {
             // set if the result is negative
             uint8_t sf:    1;
         }; // independent flags as bits
-        uint8_t F; }; uint8_t A;
-        uint8_t C;    uint8_t B; 
-        uint8_t E;    uint8_t D; 
-        uint8_t L;    uint8_t H; 
+        reg_t F; }; reg_t A;
+        reg_t C;    reg_t B; 
+        reg_t E;    reg_t D; 
+        reg_t L;    reg_t H; 
     };
     struct {
-        uint16_t PSW; // (A|F) (PSW - program status word)
-        uint16_t BC;  // (B|C) (reffered to as B)
-        uint16_t DE;  // (D|E) (reffered to as D)
-        uint16_t HL;  // (H|L) (reffered to as H)
+        w_reg_t PSW; // (A|F) (PSW - program status word)
+        w_reg_t BC;  // (B|C) (reffered to as B)
+        w_reg_t DE;  // (D|E) (reffered to as D)
+        w_reg_t HL;  // (H|L) (reffered to as H)
     };
 } registers;
 
@@ -49,6 +52,12 @@ static registers regs;
 
 // TODO lazy flag evaluation
 
+/* return the byte_cnt'th byte from the current instruction */
+inline int8_t get_op_byte(int8_t byte_cnt) {
+    // TODO check if this is correct at some point;
+    return memory[program_counter + byte_cnt];
+}
+
 /* nop */
 inline void nop(void) {}
 
@@ -56,100 +65,152 @@ inline void nop(void) {}
 
 /* 8-bit transfers */
 
+/* ========================================================== */
+
 /* move value from register r2 to register r1 */
-static inline void mov_reg_reg(uint8_t *r1, const uint8_t r2) {
+static inline void mov_reg_reg(reg_t *r1, const wuint8_t r2) {
     *r1 = r2;
 }
 
 /* move value from memory at address pointed by HL to register r */
-static inline void mov_reg_mem(uint8_t *r) {
+static inline void mov_reg_mem(reg_t *r) {
     *r = memory[regs.HL];
 }
 
 /* move value from register r to memory at address pointed by HL */
-static inline void mov_mem_reg(const uint8_t r) {
+static inline void mov_mem_reg(const reg_t r) {
     memory[regs.HL] = r;
 }
 
 /* target: B */
-inline void mov_b_b(void) { mov_reg_reg(&regs.B, regs.B); }
-inline void mov_b_c(void) { mov_reg_reg(&regs.B, regs.C); }
-inline void mov_b_d(void) { mov_reg_reg(&regs.B, regs.D); }
-inline void mov_b_e(void) { mov_reg_reg(&regs.B, regs.E); }
-inline void mov_b_h(void) { mov_reg_reg(&regs.B, regs.H); }
-inline void mov_b_l(void) { mov_reg_reg(&regs.B, regs.L); }
-inline void mov_b_m(void) { mov_reg_mem(&regs.B); }
-inline void mov_b_a(void) { mov_reg_reg(&regs.B, regs.A); }
+static inline void mov_b_b(void) { mov_reg_reg(&regs.B, regs.B); }
+static inline void mov_b_c(void) { mov_reg_reg(&regs.B, regs.C); }
+static inline void mov_b_d(void) { mov_reg_reg(&regs.B, regs.D); }
+static inline void mov_b_e(void) { mov_reg_reg(&regs.B, regs.E); }
+static inline void mov_b_h(void) { mov_reg_reg(&regs.B, regs.H); }
+static inline void mov_b_l(void) { mov_reg_reg(&regs.B, regs.L); }
+static inline void mov_b_m(void) { mov_reg_mem(&regs.B); }
+static inline void mov_b_a(void) { mov_reg_reg(&regs.B, regs.A); }
 
 /* target: C */
-inline void mov_c_b(void) { mov_reg_reg(&regs.C, regs.B); }
-inline void mov_c_c(void) { mov_reg_reg(&regs.C, regs.C); }
-inline void mov_c_d(void) { mov_reg_reg(&regs.C, regs.D); }
-inline void mov_c_e(void) { mov_reg_reg(&regs.C, regs.E); }
-inline void mov_c_h(void) { mov_reg_reg(&regs.C, regs.H); }
-inline void mov_c_l(void) { mov_reg_reg(&regs.C, regs.L); }
-inline void mov_c_m(void) { mov_reg_mem(&regs.C); }
-inline void mov_c_a(void) { mov_reg_reg(&regs.C, regs.A); }
+static inline void mov_c_b(void) { mov_reg_reg(&regs.C, regs.B); }
+static inline void mov_c_c(void) { mov_reg_reg(&regs.C, regs.C); }
+static inline void mov_c_d(void) { mov_reg_reg(&regs.C, regs.D); }
+static inline void mov_c_e(void) { mov_reg_reg(&regs.C, regs.E); }
+static inline void mov_c_h(void) { mov_reg_reg(&regs.C, regs.H); }
+static inline void mov_c_l(void) { mov_reg_reg(&regs.C, regs.L); }
+static inline void mov_c_m(void) { mov_reg_mem(&regs.C); }
+static inline void mov_c_a(void) { mov_reg_reg(&regs.C, regs.A); }
 
 /* target: D */
-inline void mov_d_b(void) { mov_reg_reg(&regs.D, regs.B); }
-inline void mov_d_c(void) { mov_reg_reg(&regs.D, regs.C); }
-inline void mov_d_d(void) { mov_reg_reg(&regs.D, regs.D); }
-inline void mov_d_e(void) { mov_reg_reg(&regs.D, regs.E); }
-inline void mov_d_h(void) { mov_reg_reg(&regs.D, regs.H); }
-inline void mov_d_l(void) { mov_reg_reg(&regs.D, regs.L); }
-inline void mov_d_m(void) { mov_reg_mem(&regs.D); }
-inline void mov_d_a(void) { mov_reg_reg(&regs.D, regs.A); }
+static inline void mov_d_b(void) { mov_reg_reg(&regs.D, regs.B); }
+static inline void mov_d_c(void) { mov_reg_reg(&regs.D, regs.C); }
+static inline void mov_d_d(void) { mov_reg_reg(&regs.D, regs.D); }
+static inline void mov_d_e(void) { mov_reg_reg(&regs.D, regs.E); }
+static inline void mov_d_h(void) { mov_reg_reg(&regs.D, regs.H); }
+static inline void mov_d_l(void) { mov_reg_reg(&regs.D, regs.L); }
+static inline void mov_d_m(void) { mov_reg_mem(&regs.D); }
+static inline void mov_d_a(void) { mov_reg_reg(&regs.D, regs.A); }
 
 /* target: E */
-inline void mov_e_b(void) { mov_reg_reg(&regs.E, regs.B); }
-inline void mov_e_c(void) { mov_reg_reg(&regs.E, regs.C); }
-inline void mov_e_d(void) { mov_reg_reg(&regs.E, regs.D); }
-inline void mov_e_e(void) { mov_reg_reg(&regs.E, regs.E); }
-inline void mov_e_h(void) { mov_reg_reg(&regs.E, regs.H); }
-inline void mov_e_l(void) { mov_reg_reg(&regs.E, regs.L); }
-inline void mov_e_m(void) { mov_reg_mem(&regs.E); }
-inline void mov_e_a(void) { mov_reg_reg(&regs.E, regs.A); }
+static inline void mov_e_b(void) { mov_reg_reg(&regs.E, regs.B); }
+static inline void mov_e_c(void) { mov_reg_reg(&regs.E, regs.C); }
+static inline void mov_e_d(void) { mov_reg_reg(&regs.E, regs.D); }
+static inline void mov_e_e(void) { mov_reg_reg(&regs.E, regs.E); }
+static inline void mov_e_h(void) { mov_reg_reg(&regs.E, regs.H); }
+static inline void mov_e_l(void) { mov_reg_reg(&regs.E, regs.L); }
+static inline void mov_e_m(void) { mov_reg_mem(&regs.E); }
+static inline void mov_e_a(void) { mov_reg_reg(&regs.E, regs.A); }
 
 /* target: F */
-inline void mov_h_b(void) { mov_reg_reg(&regs.H, regs.B); }
-inline void mov_h_c(void) { mov_reg_reg(&regs.H, regs.C); }
-inline void mov_h_d(void) { mov_reg_reg(&regs.H, regs.D); }
-inline void mov_h_e(void) { mov_reg_reg(&regs.H, regs.E); }
-inline void mov_h_h(void) { mov_reg_reg(&regs.H, regs.H); }
-inline void mov_h_l(void) { mov_reg_reg(&regs.H, regs.L); }
-inline void mov_h_m(void) { mov_reg_mem(&regs.H); }
-inline void mov_h_a(void) { mov_reg_reg(&regs.H, regs.A); }
+static inline void mov_h_b(void) { mov_reg_reg(&regs.H, regs.B); }
+static inline void mov_h_c(void) { mov_reg_reg(&regs.H, regs.C); }
+static inline void mov_h_d(void) { mov_reg_reg(&regs.H, regs.D); }
+static inline void mov_h_e(void) { mov_reg_reg(&regs.H, regs.E); }
+static inline void mov_h_h(void) { mov_reg_reg(&regs.H, regs.H); }
+static inline void mov_h_l(void) { mov_reg_reg(&regs.H, regs.L); }
+static inline void mov_h_m(void) { mov_reg_mem(&regs.H); }
+static inline void mov_h_a(void) { mov_reg_reg(&regs.H, regs.A); }
 
 /* target: L */
-inline void mov_l_b(void) { mov_reg_reg(&regs.L, regs.B); }
-inline void mov_l_c(void) { mov_reg_reg(&regs.L, regs.C); }
-inline void mov_l_d(void) { mov_reg_reg(&regs.L, regs.D); }
-inline void mov_l_e(void) { mov_reg_reg(&regs.L, regs.E); }
-inline void mov_l_h(void) { mov_reg_reg(&regs.L, regs.H); }
-inline void mov_l_l(void) { mov_reg_reg(&regs.L, regs.L); }
-inline void mov_l_m(void) { mov_reg_mem(&regs.L); }
-inline void mov_l_a(void) { mov_reg_reg(&regs.L, regs.A); }
+static inline void mov_l_b(void) { mov_reg_reg(&regs.L, regs.B); }
+static inline void mov_l_c(void) { mov_reg_reg(&regs.L, regs.C); }
+static inline void mov_l_d(void) { mov_reg_reg(&regs.L, regs.D); }
+static inline void mov_l_e(void) { mov_reg_reg(&regs.L, regs.E); }
+static inline void mov_l_h(void) { mov_reg_reg(&regs.L, regs.H); }
+static inline void mov_l_l(void) { mov_reg_reg(&regs.L, regs.L); }
+static inline void mov_l_m(void) { mov_reg_mem(&regs.L); }
+static inline void mov_l_a(void) { mov_reg_reg(&regs.L, regs.A); }
 
 /* target: memory */
-inline void mov_m_b(void) { mov_mem_reg(regs.B); }
-inline void mov_m_c(void) { mov_mem_reg(regs.C); }
-inline void mov_m_d(void) { mov_mem_reg(regs.D); }
-inline void mov_m_e(void) { mov_mem_reg(regs.E); }
-inline void mov_m_h(void) { mov_mem_reg(regs.H); }
-inline void mov_m_l(void) { mov_mem_reg(regs.L); }
+static inline void mov_m_b(void) { mov_mem_reg(regs.B); }
+static inline void mov_m_c(void) { mov_mem_reg(regs.C); }
+static inline void mov_m_d(void) { mov_mem_reg(regs.D); }
+static inline void mov_m_e(void) { mov_mem_reg(regs.E); }
+static inline void mov_m_h(void) { mov_mem_reg(regs.H); }
+static inline void mov_m_l(void) { mov_mem_reg(regs.L); }
 /* void hlt in category misc */
-inline void mov_m_a(void) { mov_mem_reg(regs.A); }
+static inline void mov_m_a(void) { mov_mem_reg(regs.A); }
 
 /* target: A */
-inline void mov_a_b(void) { mov_reg_reg(&regs.A, regs.B); }
-inline void mov_a_c(void) { mov_reg_reg(&regs.A, regs.C); }
-inline void mov_a_d(void) { mov_reg_reg(&regs.A, regs.D); }
-inline void mov_a_e(void) { mov_reg_reg(&regs.A, regs.E); }
-inline void mov_a_h(void) { mov_reg_reg(&regs.A, regs.H); }
-inline void mov_a_l(void) { mov_reg_reg(&regs.A, regs.L); }
-inline void mov_a_m(void) { mov_reg_mem(&regs.A); }
-inline void mov_a_a(void) { mov_reg_reg(&regs.A, regs.A); }
+static inline void mov_a_b(void) { mov_reg_reg(&regs.A, regs.B); }
+static inline void mov_a_c(void) { mov_reg_reg(&regs.A, regs.C); }
+static inline void mov_a_d(void) { mov_reg_reg(&regs.A, regs.D); }
+static inline void mov_a_e(void) { mov_reg_reg(&regs.A, regs.E); }
+static inline void mov_a_h(void) { mov_reg_reg(&regs.A, regs.H); }
+static inline void mov_a_l(void) { mov_reg_reg(&regs.A, regs.L); }
+static inline void mov_a_m(void) { mov_reg_mem(&regs.A); }
+static inline void mov_a_a(void) { mov_reg_reg(&regs.A, regs.A); }
+
+/* ======================== mvi ============================= */
+
+static inline void mvi_reg(reg_t *r, reg_t val) {
+    *r = val;
+}
+
+static inline void mvi_mem(uint8_t *mem, uint8_t val) {
+    *mem = val;
+}
+
+static inline void mvi_b(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.B, val);
+}
+
+static inline void mvi_c(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.C, val);
+}
+
+static inline void mvi_d(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.D, val);
+}
+
+static inline void mvi_e(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.E, val);
+}
+
+static inline void mvi_h(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.H, val);
+}
+
+static inline void mvi_l(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.L, val);
+}
+
+static inline void mvi_m(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_mem(&memory[regs.HL], val);
+}
+
+static inline void mvi_a(void) { 
+    uint8_t val = get_op_byte(1);
+    mvi_reg(&regs.A, val);
+}
 
 /* ========================================================== */
 
@@ -175,7 +236,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // INX_B
     {1,  5, 0, OP_MISC}, // INR_B
     {1,  5, 0, OP_MISC}, // DCR_B
-    {2,  7, 0, OP_MISC}, // MVI_B_D8
+    {2,  7, 0, &mvi_b}, // MVI_B_D8
     {1,  4, 0, OP_MISC}, // RLC
     {1,  4, 0, &nop},  // NOP_DUP_0
     {1, 10, 0, OP_MISC}, // DAD_B
@@ -183,7 +244,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCX_B
     {1,  5, 0, OP_MISC}, // INR_C
     {1,  5, 0, OP_MISC}, // DCR_C
-    {2,  7, 0, OP_MISC}, // MVI_C_D8
+    {2,  7, 0, &mvi_c}, // MVI_C_D8
     {1,  4, 0, OP_MISC}, // RRC
     {1,  4, 0, &nop},  // NOP_DUP_1
     {3, 10, 0, OP_MISC}, // LXI_D_D16
@@ -191,7 +252,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // INX_D
     {1,  5, 0, OP_MISC}, // INR_D
     {1,  5, 0, OP_MISC}, // DCR_D
-    {2,  7, 0, OP_MISC}, // MVI_D
+    {2,  7, 0, &mvi_d}, // MVI_D
     {1,  4, 0, OP_MISC}, // RAL
     {1,  4, 0, &nop},  // NOP_DUP_2
     {1, 10, 0, OP_MISC}, // DAD_D
@@ -199,7 +260,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCX_D
     {1,  5, 0, OP_MISC}, // INR_E
     {1,  5, 0, OP_MISC}, // DCR_E
-    {2,  7, 0, OP_MISC}, // MVI_E_D8
+    {2,  7, 0, &mvi_e}, // MVI_E_D8
     {1,  4, 0, OP_MISC}, // RAR
     {1,  4, 0, &nop},  // NOP_DUP_3
     {3, 10, 0, OP_MISC}, // LXI_H_D16
@@ -207,7 +268,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // INX_H
     {1,  5, 0, OP_MISC}, // INR_H
     {1,  5, 0, OP_MISC}, // DCR_H
-    {2,  7, 0, OP_MISC}, // MVI_H_D8
+    {2,  7, 0, &mvi_h}, // MVI_H_D8
     {1,  4, 0, OP_MISC}, // DAA
     {1,  4, 0, &nop},  // NOP_DUP_4
     {1, 10, 0, OP_MISC}, // DAD_H
@@ -215,7 +276,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCX_H
     {1,  5, 0, OP_MISC}, // INR_L
     {1,  5, 0, OP_MISC}, // DCR_L
-    {2,  7, 0, OP_MISC}, // MVI_L_D8
+    {2,  7, 0, &mvi_l}, // MVI_L_D8
     {1,  4, 0, OP_MISC}, // CMA
     {1,  4, 0, &nop},  // NOP_DUP_5
     {3, 10, 0, OP_MISC}, // LXI_SP_D16
@@ -223,7 +284,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // INX_SP
     {1, 10, 0, OP_MISC}, // INR_M
     {1, 10, 0, OP_MISC}, // DCR_M
-    {2, 10, 0, OP_MISC}, // MVI_M_D8
+    {2, 10, 0, &mvi_m}, // MVI_M_D8
     {1,  4, 0, OP_MISC}, // STC
     {1,  4, 0, &nop},  // NOP_DUP_6
     {1, 10, 0, OP_MISC}, // DAD_SP
@@ -231,7 +292,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, OP_MISC}, // DCX_SP
     {1,  5, 0, OP_MISC}, // INR_A
     {1,  5, 0, OP_MISC}, // DCR_A
-    {2,  7, 0, OP_MISC}, // MVI_A_D8
+    {2,  7, 0, &mvi_a}, // MVI_A_D8
     {1,  4, 0, OP_MISC}, // CMC
     {1,  5, 0, &mov_b_b}, // MOV_B_B
     {1,  5, 0, &mov_b_c}, // MOV_B_C
