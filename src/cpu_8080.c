@@ -52,23 +52,28 @@ static registers regs;
 
 // TODO lazy flag evaluation
 
-/* return the byte_cnt'th byte from the current instruction */
-inline int8_t get_op_byte(int8_t byte_cnt) {
+/* return the byte_offset'th byte from the current instruction */
+inline int8_t get_op_byte(int8_t byte_offset) {
     // TODO check if this is correct at some point;
-    return memory[program_counter + byte_cnt];
+    return memory[program_counter + byte_offset];
+}
+
+/* return the byte_cnt'th byte from the current instruction */
+inline int16_t get_op_2bytes(int8_t byte_offset) {
+    // TODO check if this is correct at some point;
+    int16_t ret = memory[program_counter + byte_offset];
+    return (ret << 8) | memory[program_counter + byte_offset + 1];
 }
 
 /* nop */
 inline void nop(void) {}
 
 /* ========================================================== */
-
-/* 8-bit transfers */
-
+/* =================== 8-bit transfers ====================== */
 /* ========================================================== */
 
 /* move value from register r2 to register r1 */
-static inline void mov_reg_reg(reg_t *r1, const wuint8_t r2) {
+static inline void mov_reg_reg(reg_t *r1, const reg_t r2) {
     *r1 = r2;
 }
 
@@ -164,12 +169,9 @@ static inline void mov_a_a(void) { mov_reg_reg(&regs.A, regs.A); }
 
 /* ======================== mvi ============================= */
 
+/* mov imediate value (2nd byte of opcode) to register r */
 static inline void mvi_reg(reg_t *r, reg_t val) {
     *r = val;
-}
-
-static inline void mvi_mem(uint8_t *mem, uint8_t val) {
-    *mem = val;
 }
 
 static inline void mvi_b(void) { 
@@ -202,9 +204,10 @@ static inline void mvi_l(void) {
     mvi_reg(&regs.L, val);
 }
 
+/* mov imediate value (2nd byte of opcode) to memory address HL */
 static inline void mvi_m(void) { 
     uint8_t val = get_op_byte(1);
-    mvi_mem(&memory[regs.HL], val);
+    memory[regs.HL] = val;
 }
 
 static inline void mvi_a(void) { 
@@ -212,10 +215,42 @@ static inline void mvi_a(void) {
     mvi_reg(&regs.A, val);
 }
 
+/* ======================== lda ============================= */
+
+/* load value at address into register A */
+
+static inline void ldax_b() {
+    regs.A = memory[regs.BC];
+}
+
+static inline void ldax_d() {
+    regs.A = memory[regs.DE];
+}
+
+static inline void lda() {
+    regs.A = memory[get_op_2bytes(1)];
+}
+
+/* ======================== sta ============================= */
+
+/* store value from register A at address */
+
+static inline void stax_b() {
+    memory[regs.BC] = regs.A;
+}
+
+static inline void stax_d() {
+    memory[regs.DE] = regs.A;
+}
+
+static inline void sta() {
+    memory[get_op_2bytes(1)] = regs.A;
+}
+
+/* ========================================================== */
+/* =================== 16-bit transfers ===================== */
 /* ========================================================== */
 
-/*// 16-bit transfers*/
-/*#define LXI(reg, val) (registers.(reg) = val)*/
 
 /*// 8-bit arithmetic*/
 /*#define INR(reg) registers.(reg) += 1\*/
@@ -232,7 +267,7 @@ static inline void mvi_a(void) {
 op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
     {3, 10, 0, OP_MISC}, // LXI_B_D16
-    {1,  7, 0, OP_MISC}, // STAX_B
+    {1,  7, 0, &stax_b}, // STAX_B
     {1,  5, 0, OP_MISC}, // INX_B
     {1,  5, 0, OP_MISC}, // INR_B
     {1,  5, 0, OP_MISC}, // DCR_B
@@ -240,7 +275,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // RLC
     {1,  4, 0, &nop},  // NOP_DUP_0
     {1, 10, 0, OP_MISC}, // DAD_B
-    {1,  7, 0, OP_MISC}, // LDAX_B
+    {1,  7, 0, &ldax_b}, // LDAX_B
     {1,  5, 0, OP_MISC}, // DCX_B
     {1,  5, 0, OP_MISC}, // INR_C
     {1,  5, 0, OP_MISC}, // DCR_C
@@ -248,7 +283,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // RRC
     {1,  4, 0, &nop},  // NOP_DUP_1
     {3, 10, 0, OP_MISC}, // LXI_D_D16
-    {1,  7, 0, OP_MISC}, // STAX_D
+    {1,  7, 0, &stax_d}, // STAX_D
     {1,  5, 0, OP_MISC}, // INX_D
     {1,  5, 0, OP_MISC}, // INR_D
     {1,  5, 0, OP_MISC}, // DCR_D
@@ -256,7 +291,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // RAL
     {1,  4, 0, &nop},  // NOP_DUP_2
     {1, 10, 0, OP_MISC}, // DAD_D
-    {1,  7, 0, OP_MISC}, // LDAX_D
+    {1,  7, 0, &ldax_d}, // LDAX_D
     {1,  5, 0, OP_MISC}, // DCX_D
     {1,  5, 0, OP_MISC}, // INR_E
     {1,  5, 0, OP_MISC}, // DCR_E
@@ -280,7 +315,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // CMA
     {1,  4, 0, &nop},  // NOP_DUP_5
     {3, 10, 0, OP_MISC}, // LXI_SP_D16
-    {3, 13, 0, OP_MISC}, // STA_A16
+    {3, 13, 0, &sta}, // STA_A16
     {1,  5, 0, OP_MISC}, // INX_SP
     {1, 10, 0, OP_MISC}, // INR_M
     {1, 10, 0, OP_MISC}, // DCR_M
@@ -288,7 +323,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // STC
     {1,  4, 0, &nop},  // NOP_DUP_6
     {1, 10, 0, OP_MISC}, // DAD_SP
-    {3, 13, 0, OP_MISC}, // LDA_A16
+    {3, 13, 0, &lda}, // LDA_A16
     {1,  5, 0, OP_MISC}, // DCX_SP
     {1,  5, 0, OP_MISC}, // INR_A
     {1,  5, 0, OP_MISC}, // DCR_A
