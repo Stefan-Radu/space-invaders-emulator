@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "cpu_8080.h"
+#include "utils.h"
 
 uint8_t  memory[0x10000];
 
@@ -60,6 +61,7 @@ inline int8_t get_op_byte(int8_t byte_offset) {
 
 /* return the byte_cnt'th byte from the current instruction */
 inline int16_t get_op_2bytes(int8_t byte_offset) {
+    // TODO i would assume this doesn't require an argument; to update
     // TODO check if this is correct at some point;
     int16_t ret = memory[program_counter + byte_offset];
     return (ret << 8) | memory[program_counter + byte_offset + 1];
@@ -251,22 +253,120 @@ static inline void sta() {
 /* =================== 16-bit transfers ===================== */
 /* ========================================================== */
 
+/* store in LH 16 bits from the current op */
+static inline void lhld() {
+    int16_t addr = get_op_2bytes(1);
+    regs.L = memory[addr];
+    regs.H = memory[addr + 1];
+}
 
-/*// 8-bit arithmetic*/
-/*#define INR(reg) registers.(reg) += 1\*/
-                /*if (registers.(reg) == 0) registers.zf = 1; \*/
-                /*if (registers.(reg) == 0) registers.cf = 1; \*/
-                /*if (registers.(reg) & (1 << 7)) registers.sf = 1; \*/
-                /*if (*/
-            
+/* store LH as 16 bits data at address */
+static inline void shld() {
+    int16_t addr = get_op_2bytes(1);
+    memory[addr]     = regs.L;
+    memory[addr + 1] = regs.H;
+}
 
+/* Load 16 bits from the current op big regsiters / SP */
 
-/*// 16-bit arithmetic*/
-/*#define INX(reg) (registers.(reg) += 1)*/
+static inline void lxi_b() {
+    // TODO to check byte order
+    regs.BC = get_op_2bytes(1);
+}
+
+static inline void lxi_d() {
+    // TODO to check byte order
+    regs.DE = get_op_2bytes(1);
+}
+
+static inline void lxi_h() {
+    // TODO to check byte order
+    regs.HL = get_op_2bytes(1);
+}
+
+static inline void lxi_sp() {
+    // TODO to check byte order
+    stack_pointer = (get_op_byte(2) << 8)
+        | get_op_byte(1);
+}
+
+/* push big register onto the stack; reverse of pop */
+
+static inline void push_b() {
+    memory[stack_pointer - 2] = regs.C;
+    memory[stack_pointer - 1] = regs.B;
+    stack_pointer -= 2;
+}
+
+static inline void push_d() {
+    memory[stack_pointer - 2] = regs.E;
+    memory[stack_pointer - 1] = regs.D;
+    stack_pointer -= 2;
+}
+
+static inline void push_h() {
+    memory[stack_pointer - 2] = regs.L;
+    memory[stack_pointer - 1] = regs.H;
+    stack_pointer -= 2;
+}
+
+static inline void push_psw() {
+    memory[stack_pointer - 2] = regs.F;
+    memory[stack_pointer - 1] = regs.A;
+    stack_pointer -= 2;
+}
+
+/* pop 16 bits from the stack into big register; reverse of push */
+
+static inline void pop_b() {
+    regs.C = memory[stack_pointer];
+    regs.B = memory[stack_pointer + 1];
+    stack_pointer += 2;
+}
+
+static inline void pop_d() {
+    regs.E = memory[stack_pointer];
+    regs.D = memory[stack_pointer + 1];
+    stack_pointer += 2;
+}
+
+static inline void pop_h() {
+    regs.L = memory[stack_pointer];
+    regs.H = memory[stack_pointer + 1];
+    stack_pointer += 2;
+}
+
+static inline void pop_psw() {
+    regs.F = memory[stack_pointer];
+    regs.A = memory[stack_pointer + 1];
+    stack_pointer += 2;
+}
+
+/* exchange 16bits from top of stack with HL register */
+
+static inline void xthl() {
+    swap(regs.L, memory[stack_pointer]);
+    swap(regs.H, memory[stack_pointer + 1]);
+}
+
+static inline void sphl() {
+    // TODO check that the byte order is as expected
+    stack_pointer = regs.HL;
+}
+
+/* equivalent with jmp HL */
+static inline void pchl() {
+    // TODO check that the byte order is as expected
+    program_counter = regs.HL;
+}
+
+static inline void xchg() {
+    swap(regs.HL, regs.DE);
+}
 
 op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
-    {3, 10, 0, OP_MISC}, // LXI_B_D16
+    {3, 10, 0, &lxi_b}, // LXI_B_D16
     {1,  7, 0, &stax_b}, // STAX_B
     {1,  5, 0, OP_MISC}, // INX_B
     {1,  5, 0, OP_MISC}, // INR_B
@@ -282,7 +382,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &mvi_c}, // MVI_C_D8
     {1,  4, 0, OP_MISC}, // RRC
     {1,  4, 0, &nop},  // NOP_DUP_1
-    {3, 10, 0, OP_MISC}, // LXI_D_D16
+    {3, 10, 0, &lxi_d}, // LXI_D_D16
     {1,  7, 0, &stax_d}, // STAX_D
     {1,  5, 0, OP_MISC}, // INX_D
     {1,  5, 0, OP_MISC}, // INR_D
@@ -298,8 +398,8 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &mvi_e}, // MVI_E_D8
     {1,  4, 0, OP_MISC}, // RAR
     {1,  4, 0, &nop},  // NOP_DUP_3
-    {3, 10, 0, OP_MISC}, // LXI_H_D16
-    {3, 16, 0, OP_MISC}, // SHLD_A16
+    {3, 10, 0, &lxi_h}, // LXI_H_D16
+    {3, 16, 0, &shld}, // SHLD_A16
     {1,  5, 0, OP_MISC}, // INX_H
     {1,  5, 0, OP_MISC}, // INR_H
     {1,  5, 0, OP_MISC}, // DCR_H
@@ -307,14 +407,14 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // DAA
     {1,  4, 0, &nop},  // NOP_DUP_4
     {1, 10, 0, OP_MISC}, // DAD_H
-    {3, 16, 0, OP_MISC}, // LHLD_A16
+    {3, 16, 0, &lhld}, // LHLD_A16
     {1,  5, 0, OP_MISC}, // DCX_H
     {1,  5, 0, OP_MISC}, // INR_L
     {1,  5, 0, OP_MISC}, // DCR_L
     {2,  7, 0, &mvi_l}, // MVI_L_D8
     {1,  4, 0, OP_MISC}, // CMA
     {1,  4, 0, &nop},  // NOP_DUP_5
-    {3, 10, 0, OP_MISC}, // LXI_SP_D16
+    {3, 10, 0, &lxi_sp}, // LXI_SP_D16
     {3, 13, 0, &sta}, // STA_A16
     {1,  5, 0, OP_MISC}, // INX_SP
     {1, 10, 0, OP_MISC}, // INR_M
@@ -458,11 +558,11 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  7, 0, OP_MISC}, // CMP_M
     {1,  4, 0, OP_MISC}, // CMP_A
     {1,  11,5, OP_MISC}, // RNZ
-    {1, 10, 0, OP_MISC}, // POP_B
+    {1, 10, 0, &pop_b}, // POP_B
     {3, 10, 0, OP_MISC}, // JNZ_A16
     {3, 10, 0, OP_MISC}, // JMP_A16
     {3, 17,11, OP_MISC}, // CNZ_A16
-    {1, 11, 0, OP_MISC}, // PUSH_B
+    {1, 11, 0, &push_b}, // PUSH_B
     {2,  7, 0, OP_MISC}, // ADI_D8
     {1, 11, 0, OP_MISC}, // RST_0
     {1, 11, 5, OP_MISC}, // RZ
@@ -474,11 +574,11 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, OP_MISC}, // ACI_D8
     {1, 11, 0, OP_MISC}, // RST_1
     {1, 11, 5, OP_MISC}, // RNC
-    {1, 10, 0, OP_MISC}, // POP_D
+    {1, 10, 0, &pop_d}, // POP_D
     {3, 10, 0, OP_MISC}, // JNC_A16
     {2, 10, 0, OP_MISC}, // OUT_D8
     {3, 17,11, OP_MISC}, // CNC_A16
-    {1, 11, 0, OP_MISC}, // PUSH_D
+    {1, 11, 0, &push_d}, // PUSH_D
     {2,  7, 0, OP_MISC}, // SUI_D8
     {1, 11, 0, OP_MISC}, // RST_2
     {1,  11,5, OP_MISC}, // RC
@@ -490,31 +590,31 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, OP_MISC}, // SBI_D8
     {1, 11, 0, OP_MISC}, // RST_3
     {1, 11, 5, OP_MISC}, // RPO
-    {1, 10, 0, OP_MISC}, // POP_H
+    {1, 10, 0, &pop_h}, // POP_H
     {3, 10, 0, OP_MISC}, // JPO_A16
-    {1, 18, 0, OP_MISC}, // XTHL
+    {1, 18, 0, &xthl}, // XTHL
     {3, 17,11, OP_MISC}, // CPO_A16
-    {1, 11, 0, OP_MISC}, // PUSH_H
+    {1, 11, 0, &push_h}, // PUSH_H
     {2,  7, 0, OP_MISC}, // ANI_D8
     {1, 11, 0, OP_MISC}, // RST_4
     {1, 11, 5, OP_MISC}, // RPE
-    {1,  5, 0, OP_MISC}, // PCHL
+    {1,  5, 0, &pchl}, // PCHL
     {3, 10, 0, OP_MISC}, // JPE_A16
-    {1,  5, 0, OP_MISC}, // XCHG
+    {1,  5, 0, &xchg}, // XCHG
     {3, 17,11, OP_MISC}, // CPE_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_1
     {2,  7, 0, OP_MISC}, // XRI_D8
     {1, 11, 0, OP_MISC}, // RST_5
     {1, 11, 5, OP_MISC}, // RP
-    {1, 10, 0, OP_MISC}, // POP_PSW
+    {1, 10, 0, &pop_psw}, // POP_PSW
     {3, 10, 0, OP_MISC}, // JP_A16
     {1,  4, 0, OP_MISC}, // DI
     {3, 17,11, OP_MISC}, // CP_A16
-    {1, 11, 0, OP_MISC}, // PUSH_PSW
+    {1, 11, 0, &push_psw}, // PUSH_PSW
     {2,  7, 0, OP_MISC}, // ORI_D8
     {1, 11, 0, OP_MISC}, // RST_6
     {1,  11,5, OP_MISC}, // RM
-    {1,  5, 0, OP_MISC}, // SPHL
+    {1,  5, 0, &sphl}, // SPHL
     {3, 10, 0, OP_MISC}, // JM_A16
     {1,  4, 0, OP_MISC}, // EI
     {3, 17,11, OP_MISC}, // CM_A16
