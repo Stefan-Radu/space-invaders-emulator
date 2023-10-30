@@ -9,6 +9,19 @@ uint8_t  memory[0x10000];
 uint16_t stack_pointer;
 uint16_t program_counter;
 
+uint16_t last_acc;
+uint16_t last_operand;
+
+/* TODO last operation??? */
+/* TODO figure out a way to compute flags out of last operation */
+
+typedef enum {
+    ADD8,
+    SUB8, /* TODO notice that subtraction is just complement of two addition aka x + ~y + 1 */
+} operation;
+
+operation last_operation;
+
 typedef uint8_t  reg_t;
 typedef uint16_t w_reg_t;
 
@@ -364,6 +377,90 @@ static inline void xchg() {
     swap(regs.HL, regs.DE);
 }
 
+/* ========================================================== */
+/* ===================== flag operation ===================== */
+/* ========================================================== */
+
+static inline void update_flag_variables(int8_t operand, operation op) {
+    last_acc = regs.A;
+    last_operand = operand;
+    last_operation = op;
+}
+
+/* ========================================================== */
+/* =================== 8-bit arithmetic ===================== */
+/* ========================================================== */
+
+/* add register R to the accumulator -- affects flags Z, S, P, CY, AC */
+
+static inline void add(int8_t operand) {
+    update_flag_variables(operand, ADD8);
+    regs.A += operand;
+}
+
+static inline void add_b() {
+    add(regs.B);
+}
+
+static inline void add_c() {
+    add(regs.C);
+}
+
+static inline void add_d() {
+    add(regs.D);
+}
+
+static inline void add_e() {
+    add(regs.E);
+}
+
+static inline void add_h() {
+    add(regs.H);
+}
+
+static inline void add_m() {
+    add(memory[regs.HL]);
+}
+
+static inline void add_a() {
+    add(regs.A);
+}
+
+/* subtract register R from the accumulator -- affects flags Z, S, P, CY, AC */
+
+static inline void sub(int8_t operand) {
+    update_flag_variables(operand, SUB8);
+    regs.A -= operand;
+}
+
+static inline void sub_b() {
+    sub(regs.B);
+}
+
+static inline void sub_c() {
+    sub(regs.C);
+}
+
+static inline void sub_d() {
+    sub(regs.D);
+}
+
+static inline void sub_e() {
+    sub(regs.E);
+}
+
+static inline void sub_h() {
+    sub(regs.H);
+}
+
+static inline void sub_m() {
+    sub(memory[regs.HL]);
+}
+
+static inline void sub_a() {
+    sub(regs.A);
+}
+
 op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
     {3, 10, 0, &lxi_b}, // LXI_B_D16
@@ -493,14 +590,14 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, &mov_a_l}, // MOV_A_L
     {1,  7, 0, &mov_a_m}, // MOV_A_M
     {1,  5, 0, &mov_a_a}, // MOV_A_A
-    {1,  4, 0, OP_MISC}, // ADD_B
-    {1,  4, 0, OP_MISC}, // ADD_C
-    {1,  4, 0, OP_MISC}, // ADD_D
-    {1,  4, 0, OP_MISC}, // ADD_E
-    {1,  4, 0, OP_MISC}, // ADD_H
-    {1,  4, 0, OP_MISC}, // ADD_L
-    {1,  7, 0, OP_MISC}, // ADD_M
-    {1,  4, 0, OP_MISC}, // ADD_A
+    {1,  4, 0, &add_b}, // ADD_B
+    {1,  4, 0, &add_c}, // ADD_C
+    {1,  4, 0, &add_d}, // ADD_D
+    {1,  4, 0, &add_e}, // ADD_E
+    {1,  4, 0, &add_h}, // ADD_H
+    {1,  4, 0, &add_l}, // ADD_L
+    {1,  7, 0, &add_m}, // ADD_M
+    {1,  4, 0, &add_a}, // ADD_A
     {1,  4, 0, OP_MISC}, // ADC_B
     {1,  4, 0, OP_MISC}, // ADC_C
     {1,  4, 0, OP_MISC}, // ADC_D
@@ -509,14 +606,14 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // ADC_L
     {1,  7, 0, OP_MISC}, // ADC_M
     {1,  4, 0, OP_MISC}, // ADC_A
-    {1,  4, 0, OP_MISC}, // SUB_B
-    {1,  4, 0, OP_MISC}, // SUB_C
-    {1,  4, 0, OP_MISC}, // SUB_D
-    {1,  4, 0, OP_MISC}, // SUB_E
-    {1,  4, 0, OP_MISC}, // SUB_H
-    {1,  4, 0, OP_MISC}, // SUB_L
-    {1,  7, 0, OP_MISC}, // SUB_M
-    {1,  4, 0, OP_MISC}, // SUB_A
+    {1,  4, 0, &sub_b}, // SUB_B
+    {1,  4, 0, &sub_c}, // SUB_C
+    {1,  4, 0, &sub_d}, // SUB_D
+    {1,  4, 0, &sub_e}, // SUB_E
+    {1,  4, 0, &sub_h}, // SUB_H
+    {1,  4, 0, &sub_l}, // SUB_L
+    {1,  7, 0, &sub_m}, // SUB_M
+    {1,  4, 0, &sub_a}, // SUB_A
     {1,  4, 0, OP_MISC}, // SBB_B
     {1,  4, 0, OP_MISC}, // SBB_C
     {1,  4, 0, OP_MISC}, // SBB_D
