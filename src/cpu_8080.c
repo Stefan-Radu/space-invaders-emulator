@@ -13,17 +13,24 @@ uint16_t last_acc;
 uint16_t last_operand;
 
 /* TODO last operation??? */
+// TODO lazy flag evaluation
+
 /* TODO figure out a way to compute flags out of last operation */
 
+/* TODO write tests for all operations */
+
+/* TODO implement lazy flag computation for all */
 typedef enum {
     ADD8,
     SUB8, /* TODO notice that subtraction is just complement of two addition aka x + ~y + 1 */
+    INR,
+    CMP,
+    ANA,
+    ORA,
+    XRA,
 } operation;
 
 operation last_operation;
-
-typedef uint8_t  reg_t;
-typedef uint16_t w_reg_t;
 
 // assuming little endian
 typedef union {
@@ -47,24 +54,22 @@ typedef union {
             // set if the result is negative
             uint8_t sf:    1;
         }; // independent flags as bits
-        reg_t F; }; reg_t A;
-        reg_t C;    reg_t B; 
-        reg_t E;    reg_t D; 
-        reg_t L;    reg_t H; 
+        uint8_t F; }; uint8_t A;
+        uint8_t C;    uint8_t B; 
+        uint8_t E;    uint8_t D; 
+        uint8_t L;    uint8_t H; 
     };
     struct {
-        w_reg_t PSW; // (A|F) (PSW - program status word)
-        w_reg_t BC;  // (B|C) (reffered to as B)
-        w_reg_t DE;  // (D|E) (reffered to as D)
-        w_reg_t HL;  // (H|L) (reffered to as H)
+        uint16_t PSW; // (A|F) (PSW - program status word)
+        uint16_t BC;  // (B|C) (reffered to as B)
+        uint16_t DE;  // (D|E) (reffered to as D)
+        uint16_t HL;  // (H|L) (reffered to as H)
     };
 } registers;
 
 static registers regs;
 
 // ============ INSTRUCTIONS ============
-
-// TODO lazy flag evaluation
 
 /* return the byte_offset'th byte from the current instruction */
 inline int8_t get_op_byte(int8_t byte_offset) {
@@ -88,17 +93,17 @@ inline void nop(void) {}
 /* ========================================================== */
 
 /* move value from register r2 to register r1 */
-static inline void mov_reg_reg(reg_t *r1, const reg_t r2) {
+static inline void mov_reg_reg(uint8_t *r1, const uint8_t r2) {
     *r1 = r2;
 }
 
 /* move value from memory at address pointed by HL to register r */
-static inline void mov_reg_mem(reg_t *r) {
+static inline void mov_reg_mem(uint8_t *r) {
     *r = memory[regs.HL];
 }
 
 /* move value from register r to memory at address pointed by HL */
-static inline void mov_mem_reg(const reg_t r) {
+static inline void mov_mem_reg(const uint8_t r) {
     memory[regs.HL] = r;
 }
 
@@ -185,7 +190,7 @@ static inline void mov_a_a(void) { mov_reg_reg(&regs.A, regs.A); }
 /* ======================== mvi ============================= */
 
 /* mov imediate value (2nd byte of opcode) to register r */
-static inline void mvi_reg(reg_t *r, reg_t val) {
+static inline void mvi_reg(uint8_t *r, uint8_t val) {
     *r = val;
 }
 
@@ -391,7 +396,7 @@ static inline void update_flag_variables(int8_t operand, operation op) {
 /* =================== 8-bit arithmetic ===================== */
 /* ========================================================== */
 
-/* add register R to the accumulator -- affects flags Z, S, P, CY, AC */
+/* add register R to the accumulator -- affects flags Z, S, P, C, AC */
 
 static inline void add(int8_t operand) {
     update_flag_variables(operand, ADD8);
@@ -426,7 +431,9 @@ static inline void add_a() {
     add(regs.A);
 }
 
-/* subtract register R from the accumulator -- affects flags Z, S, P, CY, AC */
+/* TODO check flags affected in manual */
+
+/* subtract register R from the accumulator -- affects flags Z, S, P, C, AC */
 
 static inline void sub(int8_t operand) {
     update_flag_variables(operand, SUB8);
@@ -461,69 +468,302 @@ static inline void sub_a() {
     sub(regs.A);
 }
 
+/* increase the register of memory area by 1 -- affects flags Z, S, P, -, AC */
+
+static inline void inr(uint8_t *r) {
+    update_flag_variables(*r, INR);
+    *r += 1;
+}
+
+static inline void inr_b() {
+    inr(&regs.B);
+}
+
+static inline void inr_c() {
+    inr(&regs.C);
+}
+
+static inline void inr_d() {
+    inr(&regs.D);
+}
+
+static inline void inr_e() {
+    inr(&regs.E);
+}
+
+static inline void inr_h() {
+    inr(&regs.H);
+}
+
+static inline void inr_l() {
+    inr(&regs.L);
+}
+
+static inline void inr_m() {
+    inr(&memory[regs.HL]);
+}
+
+static inline void inr_a() {
+    inr(&regs.A);
+}
+
+/* decrease the register of memory area by 1 -- affects flags Z, S, P, -, AC */
+
+static inline void dcr(uint8_t *r) {
+    update_flag_variables(*r, INR);
+    *r -= 1;
+}
+
+static inline void dcr_b() {
+    dcr(&regs.B);
+}
+
+static inline void dcr_c() {
+    dcr(&regs.C);
+}
+
+static inline void dcr_d() {
+    dcr(&regs.D);
+}
+
+static inline void dcr_e() {
+    dcr(&regs.E);
+}
+
+static inline void dcr_h() {
+    dcr(&regs.H);
+}
+
+static inline void dcr_l() {
+    dcr(&regs.L);
+}
+
+static inline void dcr_m() {
+    dcr(&memory[regs.HL]);
+}
+
+static inline void dcr_a() {
+    dcr(&regs.A);
+}
+
+/* compares register or memory area with accumulator -- affects flags Z, S, P, C, AC */
+
+static inline void cmp(uint8_t value) {
+    update_flag_variables(value, CMP); 
+}
+
+static inline void cmp_b() {
+    cmp(regs.B);
+}
+
+static inline void cmp_c() {
+    cmp(regs.C);
+}
+
+static inline void cmp_d() {
+    cmp(regs.D);
+}
+
+static inline void cmp_e() {
+    cmp(regs.E);
+}
+
+static inline void cmp_h() {
+    cmp(regs.H);
+}
+
+static inline void cmp_l() {
+    cmp(regs.L);
+}
+
+static inline void cmp_m() {
+    cmp(memory[regs.HL]);
+}
+
+static inline void cmp_a() {
+    cmp(regs.A);
+}
+
+/* Logically AND (&) register/memory with accumulator -- flag affected C, Z, S, P */
+
+static inline void ana(int8_t val) {
+    regs.A &= val;
+    update_flag_variables(val, ANA);
+}
+
+static inline void ana_b() {
+    ana(regs.B);
+}
+
+static inline void ana_c() {
+    ana(regs.C);
+}
+
+static inline void ana_d() {
+    ana(regs.D);
+}
+
+static inline void ana_e() {
+    ana(regs.E);
+}
+
+static inline void ana_h() {
+    ana(regs.H);
+}
+
+static inline void ana_l() {
+    ana(regs.L);
+}
+
+static inline void ana_m() {
+    ana(memory[regs.HL]);
+}
+
+static inline void ana_a() {
+    ana(regs.A);
+}
+
+/* Logically OR (|) register/memory with accumulator -- flag affected C, Z, S, P */
+
+static inline void ora(int8_t val) {
+    regs.A |= val;
+    update_flag_variables(val, ORA);
+}
+
+static inline void ora_b() {
+    ora(regs.B);
+}
+
+static inline void ora_c() {
+    ora(regs.C);
+}
+
+static inline void ora_d() {
+    ora(regs.D);
+}
+
+static inline void ora_e() {
+    ora(regs.E);
+}
+
+static inline void ora_h() {
+    ora(regs.H);
+}
+
+static inline void ora_l() {
+    ora(regs.L);
+}
+
+static inline void ora_m() {
+    ora(memory[regs.HL]);
+}
+
+static inline void ora_a() {
+    ora(regs.A);
+}
+
+/* Logically XOR (^) register/memory with accumulator -- flag affected C, Z, S, ?, P */
+
+static inline void xra(int8_t val) {
+    regs.A ^= val;
+    update_flag_variables(val, ORA);
+}
+
+static inline void xra_b() {
+    xra(regs.B);
+}
+
+static inline void xra_c() {
+    xra(regs.C);
+}
+
+static inline void xra_d() {
+    xra(regs.D);
+}
+
+static inline void xra_e() {
+    xra(regs.E);
+}
+
+static inline void xra_h() {
+    xra(regs.H);
+}
+
+static inline void xra_l() {
+    xra(regs.L);
+}
+
+static inline void xra_m() {
+    xra(memory[regs.HL]);
+}
+
+static inline void xra_a() {
+    xra(regs.A);
+}
+
 op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
     {3, 10, 0, &lxi_b}, // LXI_B_D16
     {1,  7, 0, &stax_b}, // STAX_B
     {1,  5, 0, OP_MISC}, // INX_B
-    {1,  5, 0, OP_MISC}, // INR_B
-    {1,  5, 0, OP_MISC}, // DCR_B
+    {1,  5, 0, &inr_b}, // INR_B
+    {1,  5, 0, &dcr_b}, // DCR_B
     {2,  7, 0, &mvi_b}, // MVI_B_D8
     {1,  4, 0, OP_MISC}, // RLC
     {1,  4, 0, &nop},  // NOP_DUP_0
     {1, 10, 0, OP_MISC}, // DAD_B
     {1,  7, 0, &ldax_b}, // LDAX_B
     {1,  5, 0, OP_MISC}, // DCX_B
-    {1,  5, 0, OP_MISC}, // INR_C
-    {1,  5, 0, OP_MISC}, // DCR_C
+    {1,  5, 0, &inr_c}, // INR_C
+    {1,  5, 0, &dcr_c}, // DCR_C
     {2,  7, 0, &mvi_c}, // MVI_C_D8
     {1,  4, 0, OP_MISC}, // RRC
     {1,  4, 0, &nop},  // NOP_DUP_1
     {3, 10, 0, &lxi_d}, // LXI_D_D16
     {1,  7, 0, &stax_d}, // STAX_D
     {1,  5, 0, OP_MISC}, // INX_D
-    {1,  5, 0, OP_MISC}, // INR_D
-    {1,  5, 0, OP_MISC}, // DCR_D
+    {1,  5, 0, &inr_d}, // INR_D
+    {1,  5, 0, &dcr_d}, // DCR_D
     {2,  7, 0, &mvi_d}, // MVI_D
     {1,  4, 0, OP_MISC}, // RAL
     {1,  4, 0, &nop},  // NOP_DUP_2
     {1, 10, 0, OP_MISC}, // DAD_D
     {1,  7, 0, &ldax_d}, // LDAX_D
     {1,  5, 0, OP_MISC}, // DCX_D
-    {1,  5, 0, OP_MISC}, // INR_E
-    {1,  5, 0, OP_MISC}, // DCR_E
+    {1,  5, 0, &inr_e}, // INR_E
+    {1,  5, 0, &dcr_e}, // DCR_E
     {2,  7, 0, &mvi_e}, // MVI_E_D8
     {1,  4, 0, OP_MISC}, // RAR
     {1,  4, 0, &nop},  // NOP_DUP_3
     {3, 10, 0, &lxi_h}, // LXI_H_D16
     {3, 16, 0, &shld}, // SHLD_A16
     {1,  5, 0, OP_MISC}, // INX_H
-    {1,  5, 0, OP_MISC}, // INR_H
-    {1,  5, 0, OP_MISC}, // DCR_H
+    {1,  5, 0, &inr_h}, // INR_H
+    {1,  5, 0, &dcr_h}, // DCR_H
     {2,  7, 0, &mvi_h}, // MVI_H_D8
     {1,  4, 0, OP_MISC}, // DAA
     {1,  4, 0, &nop},  // NOP_DUP_4
     {1, 10, 0, OP_MISC}, // DAD_H
     {3, 16, 0, &lhld}, // LHLD_A16
     {1,  5, 0, OP_MISC}, // DCX_H
-    {1,  5, 0, OP_MISC}, // INR_L
-    {1,  5, 0, OP_MISC}, // DCR_L
+    {1,  5, 0, &inr_l}, // INR_L
+    {1,  5, 0, &dcr_l}, // DCR_L
     {2,  7, 0, &mvi_l}, // MVI_L_D8
     {1,  4, 0, OP_MISC}, // CMA
     {1,  4, 0, &nop},  // NOP_DUP_5
     {3, 10, 0, &lxi_sp}, // LXI_SP_D16
     {3, 13, 0, &sta}, // STA_A16
     {1,  5, 0, OP_MISC}, // INX_SP
-    {1, 10, 0, OP_MISC}, // INR_M
-    {1, 10, 0, OP_MISC}, // DCR_M
+    {1, 10, 0, &inr_m}, // INR_M
+    {1, 10, 0, &dcr_m}, // DCR_M
     {2, 10, 0, &mvi_m}, // MVI_M_D8
     {1,  4, 0, OP_MISC}, // STC
     {1,  4, 0, &nop},  // NOP_DUP_6
     {1, 10, 0, OP_MISC}, // DAD_SP
     {3, 13, 0, &lda}, // LDA_A16
     {1,  5, 0, OP_MISC}, // DCX_SP
-    {1,  5, 0, OP_MISC}, // INR_A
-    {1,  5, 0, OP_MISC}, // DCR_A
+    {1,  5, 0, &inr_a}, // INR_A
+    {1,  5, 0, &dcr_a}, // DCR_A
     {2,  7, 0, &mvi_a}, // MVI_A_D8
     {1,  4, 0, OP_MISC}, // CMC
     {1,  5, 0, &mov_b_b}, // MOV_B_B
@@ -622,38 +862,38 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // SBB_L
     {1,  7, 0, OP_MISC}, // SBB_M
     {1,  4, 0, OP_MISC}, // SBB_A
-    {1,  4, 0, OP_MISC}, // ANA_B
-    {1,  4, 0, OP_MISC}, // ANA_C
-    {1,  4, 0, OP_MISC}, // ANA_D
-    {1,  4, 0, OP_MISC}, // ANA_E
-    {1,  4, 0, OP_MISC}, // ANA_H
-    {1,  4, 0, OP_MISC}, // ANA_L
-    {1,  7, 0, OP_MISC}, // ANA_M
-    {1,  4, 0, OP_MISC}, // ANA_A
-    {1,  4, 0, OP_MISC}, // XRA_B
-    {1,  4, 0, OP_MISC}, // XRA_C
-    {1,  4, 0, OP_MISC}, // XRA_D
-    {1,  4, 0, OP_MISC}, // XRA_E
-    {1,  4, 0, OP_MISC}, // XRA_H
-    {1,  4, 0, OP_MISC}, // XRA_L
-    {1,  7, 0, OP_MISC}, // XRA_M
-    {1,  4, 0, OP_MISC}, // XRA_A
-    {1,  4, 0, OP_MISC}, // ORA_B
-    {1,  4, 0, OP_MISC}, // ORA_C
-    {1,  4, 0, OP_MISC}, // ORA_D
-    {1,  4, 0, OP_MISC}, // ORA_E
-    {1,  4, 0, OP_MISC}, // ORA_H
-    {1,  4, 0, OP_MISC}, // ORA_L
-    {1,  7, 0, OP_MISC}, // ORA_M
-    {1,  4, 0, OP_MISC}, // ORA_A
-    {1,  4, 0, OP_MISC}, // CMP_B
-    {1,  4, 0, OP_MISC}, // CMP_C
-    {1,  4, 0, OP_MISC}, // CMP_D
-    {1,  4, 0, OP_MISC}, // CMP_E
-    {1,  4, 0, OP_MISC}, // CMP_H
-    {1,  4, 0, OP_MISC}, // CMP_L
-    {1,  7, 0, OP_MISC}, // CMP_M
-    {1,  4, 0, OP_MISC}, // CMP_A
+    {1,  4, 0, &ana_b}, // ANA_B
+    {1,  4, 0, &ana_c}, // ANA_C
+    {1,  4, 0, &ana_d}, // ANA_D
+    {1,  4, 0, &ana_e}, // ANA_E
+    {1,  4, 0, &ana_h}, // ANA_H
+    {1,  4, 0, &ana_l}, // ANA_L
+    {1,  7, 0, &ana_m}, // ANA_M
+    {1,  4, 0, &ana_a}, // ANA_A
+    {1,  4, 0, &xra_b}, // XRA_B
+    {1,  4, 0, &xra_c}, // XRA_C
+    {1,  4, 0, &xra_d}, // XRA_D
+    {1,  4, 0, &xra_e}, // XRA_E
+    {1,  4, 0, &xra_h}, // XRA_H
+    {1,  4, 0, &xra_l}, // XRA_L
+    {1,  7, 0, &xra_m}, // XRA_M
+    {1,  4, 0, &xra_a}, // XRA_A
+    {1,  4, 0, &ora_b}, // ORA_B
+    {1,  4, 0, &ora_c}, // ORA_C
+    {1,  4, 0, &ora_d}, // ORA_D
+    {1,  4, 0, &ora_e}, // ORA_E
+    {1,  4, 0, &ora_h}, // ORA_H
+    {1,  4, 0, &ora_l}, // ORA_L
+    {1,  7, 0, &ora_m}, // ORA_M
+    {1,  4, 0, &ora_a}, // ORA_A
+    {1,  4, 0, &cmp_b}, // CMP_B
+    {1,  4, 0, &cmp_c}, // CMP_C
+    {1,  4, 0, &cmp_d}, // CMP_D
+    {1,  4, 0, &cmp_e}, // CMP_E
+    {1,  4, 0, &cmp_h}, // CMP_H
+    {1,  4, 0, &cmp_l}, // CMP_L
+    {1,  7, 0, &cmp_m}, // CMP_M
+    {1,  4, 0, &cmp_a}, // CMP_A
     {1,  11,5, OP_MISC}, // RNZ
     {1, 10, 0, &pop_b}, // POP_B
     {3, 10, 0, OP_MISC}, // JNZ_A16
