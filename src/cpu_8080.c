@@ -24,10 +24,10 @@ typedef enum {
     ADD8,
     SUB8, /* TODO notice that subtraction is just complement of two addition aka x + ~y + 1 */
     INR,
-    CMP,
-    ANA,
-    ORA,
-    XRA,
+    CMP8,
+    AND8,
+    OR8,
+    XOR8,
 } operation;
 
 operation last_operation;
@@ -74,6 +74,7 @@ static registers regs;
 /* return the byte_offset'th byte from the current instruction */
 inline int8_t get_op_byte(int8_t byte_offset) {
     // TODO check if this is correct at some point;
+    // TODO check if this needs offset
     return memory[program_counter + byte_offset];
 }
 
@@ -549,7 +550,7 @@ static inline void dcr_a() {
 /* compares register or memory area with accumulator -- affects flags Z, S, P, C, AC */
 
 static inline void cmp(uint8_t value) {
-    update_flag_variables(value, CMP); 
+    update_flag_variables(value, CMP8); 
 }
 
 static inline void cmp_b() {
@@ -588,7 +589,7 @@ static inline void cmp_a() {
 
 static inline void ana(int8_t val) {
     regs.A &= val;
-    update_flag_variables(val, ANA);
+    update_flag_variables(val, AND8);
 }
 
 static inline void ana_b() {
@@ -627,7 +628,7 @@ static inline void ana_a() {
 
 static inline void ora(int8_t val) {
     regs.A |= val;
-    update_flag_variables(val, ORA);
+    update_flag_variables(val, OR8);
 }
 
 static inline void ora_b() {
@@ -666,7 +667,7 @@ static inline void ora_a() {
 
 static inline void xra(int8_t val) {
     regs.A ^= val;
-    update_flag_variables(val, ORA);
+    update_flag_variables(val, XOR8);
 }
 
 static inline void xra_b() {
@@ -699,6 +700,44 @@ static inline void xra_m() {
 
 static inline void xra_a() {
     xra(regs.A);
+}
+
+/* immediate 8-bit arithmetic operations */
+
+static inline void adi() {
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, ADD8);
+    regs.A += operand;
+}
+
+static inline void sui() {
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, SUB8);
+    regs.A -= operand;
+}
+
+static inline void cpi() {
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, CMP8);
+}
+
+static inline void ani() {
+    // TODO correct upstream typo (https://gist.github.com/joefg/634fa4a1046516d785c9#file-8080-op-L52)
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, AND8);
+    regs.A &= operand;
+}
+
+static inline void ori() {
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, OR8);
+    regs.A |= operand;
+}
+
+static inline void xri() {
+    int8_t operand = get_op_byte(1);
+    update_flag_variables(operand, XOR8);
+    regs.A ^= operand;
 }
 
 op_code_detail op_code_details[OP_CODES_CNT] = {
@@ -900,7 +939,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {3, 10, 0, OP_MISC}, // JMP_A16
     {3, 17,11, OP_MISC}, // CNZ_A16
     {1, 11, 0, &push_b}, // PUSH_B
-    {2,  7, 0, OP_MISC}, // ADI_D8
+    {2,  7, 0, &adi}, // ADI_D8
     {1, 11, 0, OP_MISC}, // RST_0
     {1, 11, 5, OP_MISC}, // RZ
     {1, 10, 0, OP_MISC}, // RET
@@ -916,7 +955,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2, 10, 0, OP_MISC}, // OUT_D8
     {3, 17,11, OP_MISC}, // CNC_A16
     {1, 11, 0, &push_d}, // PUSH_D
-    {2,  7, 0, OP_MISC}, // SUI_D8
+    {2,  7, 0, &sui}, // SUI_D8
     {1, 11, 0, OP_MISC}, // RST_2
     {1,  11,5, OP_MISC}, // RC
     {1, 10, 0, OP_MISC}, // RET_DUP_0
@@ -932,7 +971,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 18, 0, &xthl}, // XTHL
     {3, 17,11, OP_MISC}, // CPO_A16
     {1, 11, 0, &push_h}, // PUSH_H
-    {2,  7, 0, OP_MISC}, // ANI_D8
+    {2,  7, 0, &ani}, // ANI_D8
     {1, 11, 0, OP_MISC}, // RST_4
     {1, 11, 5, OP_MISC}, // RPE
     {1,  5, 0, &pchl}, // PCHL
@@ -940,7 +979,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, &xchg}, // XCHG
     {3, 17,11, OP_MISC}, // CPE_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_1
-    {2,  7, 0, OP_MISC}, // XRI_D8
+    {2,  7, 0, &xri}, // XRI_D8
     {1, 11, 0, OP_MISC}, // RST_5
     {1, 11, 5, OP_MISC}, // RP
     {1, 10, 0, &pop_psw}, // POP_PSW
@@ -948,7 +987,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // DI
     {3, 17,11, OP_MISC}, // CP_A16
     {1, 11, 0, &push_psw}, // PUSH_PSW
-    {2,  7, 0, OP_MISC}, // ORI_D8
+    {2,  7, 0, &ori}, // ORI_D8
     {1, 11, 0, OP_MISC}, // RST_6
     {1,  11,5, OP_MISC}, // RM
     {1,  5, 0, &sphl}, // SPHL
@@ -956,7 +995,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, OP_MISC}, // EI
     {3, 17,11, OP_MISC}, // CM_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_2
-    {2,  7, 0, OP_MISC}, // CPI_D8
+    {2,  7, 0, &cpi}, // CPI_D8
     {1, 11, 0, OP_MISC}, // RST_7
 };
 
