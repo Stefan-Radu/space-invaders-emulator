@@ -881,6 +881,42 @@ static inline void dad_sp() {
     dad(stack_pointer);
 }
 
+/* increments register-pair by 1 */
+
+static inline void inx_b() {
+    regs.BC += 1;
+}
+
+static inline void inx_d() {
+    regs.DE += 1;
+}
+
+static inline void inx_h() {
+    regs.HL += 1;
+}
+
+static inline void inx_sp() {
+    stack_pointer += 1;
+}
+
+/* decrements register-pair by 1 */
+
+static inline void dcx_b() {
+    regs.BC -= 1;
+}
+
+static inline void dcx_d() {
+    regs.DE -= 1;
+}
+
+static inline void dcx_h() {
+    regs.HL -= 1;
+}
+
+static inline void dcx_sp() {
+    stack_pointer -= 1;
+}
+
 /* TODO have this in a sepparate file, so all operation
  * implementations are isolated */
 
@@ -888,7 +924,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
     {3, 10, 0, &lxi_b}, // LXI_B_D16
     {1,  7, 0, &stax_b}, // STAX_B
-    {1,  5, 0, OP_MISC}, // INX_B
+    {1,  5, 0, &inx_b}, // INX_B
     {1,  5, 0, &inr_b}, // INR_B
     {1,  5, 0, &dcr_b}, // DCR_B
     {2,  7, 0, &mvi_b}, // MVI_B_D8
@@ -896,7 +932,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_0
     {1, 10, 0, &dad_b}, // DAD_B
     {1,  7, 0, &ldax_b}, // LDAX_B
-    {1,  5, 0, OP_MISC}, // DCX_B
+    {1,  5, 0, &dcx_b}, // DCX_B
     {1,  5, 0, &inr_c}, // INR_C
     {1,  5, 0, &dcr_c}, // DCR_C
     {2,  7, 0, &mvi_c}, // MVI_C_D8
@@ -904,7 +940,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_1
     {3, 10, 0, &lxi_d}, // LXI_D_D16
     {1,  7, 0, &stax_d}, // STAX_D
-    {1,  5, 0, OP_MISC}, // INX_D
+    {1,  5, 0, &inx_d}, // INX_D
     {1,  5, 0, &inr_d}, // INR_D
     {1,  5, 0, &dcr_d}, // DCR_D
     {2,  7, 0, &mvi_d}, // MVI_D
@@ -912,7 +948,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_2
     {1, 10, 0, &dad_d}, // DAD_D
     {1,  7, 0, &ldax_d}, // LDAX_D
-    {1,  5, 0, OP_MISC}, // DCX_D
+    {1,  5, 0, &dcx_d}, // DCX_D
     {1,  5, 0, &inr_e}, // INR_E
     {1,  5, 0, &dcr_e}, // DCR_E
     {2,  7, 0, &mvi_e}, // MVI_E_D8
@@ -920,7 +956,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_3
     {3, 10, 0, &lxi_h}, // LXI_H_D16
     {3, 16, 0, &shld}, // SHLD_A16
-    {1,  5, 0, OP_MISC}, // INX_H
+    {1,  5, 0, &inx_h}, // INX_H
     {1,  5, 0, &inr_h}, // INR_H
     {1,  5, 0, &dcr_h}, // DCR_H
     {2,  7, 0, &mvi_h}, // MVI_H_D8
@@ -928,7 +964,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_4
     {1, 10, 0, &dad_h}, // DAD_H
     {3, 16, 0, &lhld}, // LHLD_A16
-    {1,  5, 0, OP_MISC}, // DCX_H
+    {1,  5, 0, &dcx_h}, // DCX_H
     {1,  5, 0, &inr_l}, // INR_L
     {1,  5, 0, &dcr_l}, // DCR_L
     {2,  7, 0, &mvi_l}, // MVI_L_D8
@@ -936,7 +972,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_5
     {3, 10, 0, &lxi_sp}, // LXI_SP_D16
     {3, 13, 0, &sta}, // STA_A16
-    {1,  5, 0, OP_MISC}, // INX_SP
+    {1,  5, 0, &inx_sp}, // INX_SP
     {1, 10, 0, &inr_m}, // INR_M
     {1, 10, 0, &dcr_m}, // DCR_M
     {2, 10, 0, &mvi_m}, // MVI_M_D8
@@ -944,7 +980,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP_DUP_6
     {1, 10, 0, &dad_sp}, // DAD_SP
     {3, 13, 0, &lda}, // LDA_A16
-    {1,  5, 0, OP_MISC}, // DCX_SP
+    {1,  5, 0, &dcx_sp}, // DCX_SP
     {1,  5, 0, &inr_a}, // INR_A
     {1,  5, 0, &dcr_a}, // DCR_A
     {2,  7, 0, &mvi_a}, // MVI_A_D8
