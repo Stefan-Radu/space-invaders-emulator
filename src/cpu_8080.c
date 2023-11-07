@@ -17,7 +17,7 @@ uint16_t last_operand;
 
 /* TODO figure out a way to compute flags out of last operation */
 
-/* TODO write tests for all operations */
+/* TODO write tests for all operations - decide on testing framework (simple rather than complicated) */
 
 /* TODO implement lazy flag computation for all */
 typedef enum {
@@ -28,6 +28,9 @@ typedef enum {
     AND8,
     OR8,
     XOR8,
+    ADC,
+    SBB,
+    DAD16,
 } operation;
 
 operation last_operation;
@@ -37,6 +40,7 @@ typedef union {
     struct { 
         union { 
         struct {
+            /* TODO comments seem destroyed here */
             // carry flag: last addition carry of last subtraction borrow
             uint8_t cf:    1; 
             // not used; default -1
@@ -75,6 +79,7 @@ static registers regs;
 inline int8_t get_op_byte(int8_t byte_offset) {
     // TODO check if this is correct at some point;
     // TODO check if this needs offset
+    // TODO if it needs offset, maybe have two different so I can avoid argument
     return memory[program_counter + byte_offset];
 }
 
@@ -387,7 +392,13 @@ static inline void xchg() {
 /* ===================== flag operation ===================== */
 /* ========================================================== */
 
-static inline void update_flag_variables(int8_t operand, operation op) {
+/* TODO seperate flag setter for AC --> this is only used in DAA */
+static inline void update_flag_ac();
+
+/* TODO seperate flag setter for all other flags */
+static inline void update_flags_non_ac();
+
+static inline void update_flag_variables(int16_t operand, operation op) {
     last_acc = regs.A;
     last_operand = operand;
     last_operation = op;
@@ -740,6 +751,139 @@ static inline void xri() {
     regs.A ^= operand;
 }
 
+static inline void daa() {
+    /* TODO */
+}
+
+/* add register or memory to accumulator with carry - affects C, S, Z, P, AC */
+
+static inline void adc(int8_t operand) {
+    /* TODO is the order here is correct */
+    update_flags_non_ac();
+    update_flag_variables(operand, ADC);
+    regs.A += operand + regs.cf;
+}
+
+static inline void adc_b() {
+    adc(regs.B);
+}
+
+static inline void adc_c() {
+    adc(regs.C);
+}
+
+static inline void adc_d() {
+    adc(regs.D);
+}
+
+static inline void adc_e() {
+    adc(regs.E);
+}
+
+static inline void adc_h() {
+    adc(regs.H);
+}
+
+static inline void adc_l() {
+    adc(regs.L);
+}
+
+static inline void adc_m() {
+    adc(memory[regs.HL]);
+}
+
+static inline void adc_a() {
+    adc(regs.A);
+}
+
+/* add immediate value to accumulator with carry - affects C, S, Z, P, AC */
+
+static inline void aci() {
+    int8_t value = get_op_byte(1);
+    update_flags_non_ac();
+    update_flag_variables(value, ADC);
+    regs.A += value + regs.cf;
+}
+
+/* subtract register or memory from accumulator with carry - affects C, S, Z, P, AC */
+
+static inline void sbb(int8_t operand) {
+    update_flags_non_ac();
+    update_flag_variables(operand, SBB);
+    regs.A -= (operand + regs.cf);
+}
+
+static inline void sbb_b() {
+    sbb(regs.B);
+}
+
+static inline void sbb_c() {
+    sbb(regs.C);
+}
+
+static inline void sbb_d() {
+    sbb(regs.D);
+}
+
+static inline void sbb_e() {
+    sbb(regs.E);
+}
+
+static inline void sbb_h() {
+    sbb(regs.H);
+}
+
+static inline void sbb_l() {
+    sbb(regs.L);
+}
+
+static inline void sbb_m() {
+    sbb(memory[regs.HL]);
+}
+
+static inline void sbb_a() {
+    sbb(regs.A);
+}
+
+/* subtract immediate value from accumulator with carry - affects C, S, Z, P, AC */
+
+static inline void sbi() {
+    int8_t value = get_op_byte(1);
+    update_flags_non_ac();
+    update_flag_variables(value, SBB);
+    regs.A -= (value + regs.cf);
+}
+
+/* ========================================================== */
+/* =================== 16-bit arithmetic ==================== */
+/* ========================================================== */
+
+/* adds content of register-pair to HL */
+
+static inline void dad(int16_t operand) {
+    update_flag_variables(operand, DAD16);
+    regs.HL += operand;
+}
+
+static inline void dad_b() {
+    dad(regs.BC);
+}
+
+static inline void dad_d() {
+    dad(regs.DE);
+}
+
+static inline void dad_h() {
+    dad(regs.HL);
+}
+
+static inline void dad_sp() {
+    dad(stack_pointer);
+}
+
+/* TODO have this in a sepparate file, so all operation
+ * implementations are isolated */
+
 op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &nop},  // NOP
     {3, 10, 0, &lxi_b}, // LXI_B_D16
@@ -750,7 +894,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &mvi_b}, // MVI_B_D8
     {1,  4, 0, OP_MISC}, // RLC
     {1,  4, 0, &nop},  // NOP_DUP_0
-    {1, 10, 0, OP_MISC}, // DAD_B
+    {1, 10, 0, &dad_b}, // DAD_B
     {1,  7, 0, &ldax_b}, // LDAX_B
     {1,  5, 0, OP_MISC}, // DCX_B
     {1,  5, 0, &inr_c}, // INR_C
@@ -766,7 +910,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &mvi_d}, // MVI_D
     {1,  4, 0, OP_MISC}, // RAL
     {1,  4, 0, &nop},  // NOP_DUP_2
-    {1, 10, 0, OP_MISC}, // DAD_D
+    {1, 10, 0, &dad_d}, // DAD_D
     {1,  7, 0, &ldax_d}, // LDAX_D
     {1,  5, 0, OP_MISC}, // DCX_D
     {1,  5, 0, &inr_e}, // INR_E
@@ -782,7 +926,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &mvi_h}, // MVI_H_D8
     {1,  4, 0, OP_MISC}, // DAA
     {1,  4, 0, &nop},  // NOP_DUP_4
-    {1, 10, 0, OP_MISC}, // DAD_H
+    {1, 10, 0, &dad_h}, // DAD_H
     {3, 16, 0, &lhld}, // LHLD_A16
     {1,  5, 0, OP_MISC}, // DCX_H
     {1,  5, 0, &inr_l}, // INR_L
@@ -798,7 +942,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2, 10, 0, &mvi_m}, // MVI_M_D8
     {1,  4, 0, OP_MISC}, // STC
     {1,  4, 0, &nop},  // NOP_DUP_6
-    {1, 10, 0, OP_MISC}, // DAD_SP
+    {1, 10, 0, &dad_sp}, // DAD_SP
     {3, 13, 0, &lda}, // LDA_A16
     {1,  5, 0, OP_MISC}, // DCX_SP
     {1,  5, 0, &inr_a}, // INR_A
@@ -877,14 +1021,14 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &add_l}, // ADD_L
     {1,  7, 0, &add_m}, // ADD_M
     {1,  4, 0, &add_a}, // ADD_A
-    {1,  4, 0, OP_MISC}, // ADC_B
-    {1,  4, 0, OP_MISC}, // ADC_C
-    {1,  4, 0, OP_MISC}, // ADC_D
-    {1,  4, 0, OP_MISC}, // ADC_E
-    {1,  4, 0, OP_MISC}, // ADC_H
-    {1,  4, 0, OP_MISC}, // ADC_L
-    {1,  7, 0, OP_MISC}, // ADC_M
-    {1,  4, 0, OP_MISC}, // ADC_A
+    {1,  4, 0, &adc_b}, // ADC_B
+    {1,  4, 0, &adc_c}, // ADC_C
+    {1,  4, 0, &adc_d}, // ADC_D
+    {1,  4, 0, &adc_e}, // ADC_E
+    {1,  4, 0, &adc_h}, // ADC_H
+    {1,  4, 0, &adc_l}, // ADC_L
+    {1,  7, 0, &adc_m}, // ADC_M
+    {1,  4, 0, &adc_a}, // ADC_A
     {1,  4, 0, &sub_b}, // SUB_B
     {1,  4, 0, &sub_c}, // SUB_C
     {1,  4, 0, &sub_d}, // SUB_D
@@ -893,14 +1037,14 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &sub_l}, // SUB_L
     {1,  7, 0, &sub_m}, // SUB_M
     {1,  4, 0, &sub_a}, // SUB_A
-    {1,  4, 0, OP_MISC}, // SBB_B
-    {1,  4, 0, OP_MISC}, // SBB_C
-    {1,  4, 0, OP_MISC}, // SBB_D
-    {1,  4, 0, OP_MISC}, // SBB_E
-    {1,  4, 0, OP_MISC}, // SBB_H
-    {1,  4, 0, OP_MISC}, // SBB_L
-    {1,  7, 0, OP_MISC}, // SBB_M
-    {1,  4, 0, OP_MISC}, // SBB_A
+    {1,  4, 0, &sbb_b}, // SBB_B
+    {1,  4, 0, &sbb_c}, // SBB_C
+    {1,  4, 0, &sbb_d}, // SBB_D
+    {1,  4, 0, &sbb_e}, // SBB_E
+    {1,  4, 0, &sbb_h}, // SBB_H
+    {1,  4, 0, &sbb_l}, // SBB_L
+    {1,  7, 0, &sbb_m}, // SBB_M
+    {1,  4, 0, &sbb_a}, // SBB_A
     {1,  4, 0, &ana_b}, // ANA_B
     {1,  4, 0, &ana_c}, // ANA_C
     {1,  4, 0, &ana_d}, // ANA_D
@@ -947,7 +1091,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {3, 10, 0, OP_MISC}, // JMP_A16_DUP_0
     {3, 17,11, OP_MISC}, // CZ
     {3, 17, 0, OP_MISC}, // CALL_A16
-    {2,  7, 0, OP_MISC}, // ACI_D8
+    {2,  7, 0, &aci}, // ACI_D8
     {1, 11, 0, OP_MISC}, // RST_1
     {1, 11, 5, OP_MISC}, // RNC
     {1, 10, 0, &pop_d}, // POP_D
@@ -963,7 +1107,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2, 10, 0, OP_MISC}, // IN_D8
     {3, 17,11, OP_MISC}, // CC_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_0
-    {2,  7, 0, OP_MISC}, // SBI_D8
+    {2,  7, 0, &sbi}, // SBI_D8
     {1, 11, 0, OP_MISC}, // RST_3
     {1, 11, 5, OP_MISC}, // RPO
     {1, 10, 0, &pop_h}, // POP_H
@@ -998,9 +1142,6 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {2,  7, 0, &cpi}, // CPI_D8
     {1, 11, 0, OP_MISC}, // RST_7
 };
-
-static void test_set_registers() {
-}
 
 void print_registers() {
     test_set_registers();
