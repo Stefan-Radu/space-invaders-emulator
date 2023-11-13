@@ -4,13 +4,14 @@
 #include "cpu_8080.h"
 #include "utils.h"
 
-uint8_t  memory[0x10000];
+static uint8_t  memory[0x10000];
 
-uint16_t stack_pointer;
-uint16_t program_counter;
+static uint16_t stack_pointer;
+static uint16_t program_counter;
 
-uint16_t last_acc;
-uint16_t last_operand;
+static uint16_t last_acc;
+static uint16_t last_operand;
+static int8_t flags_updated = 0; // TODO used this?
 
 /* TODO last operation??? */
 // TODO lazy flag evaluation
@@ -86,9 +87,10 @@ inline int8_t get_op_byte(int8_t byte_offset) {
 /* return the byte_cnt'th byte from the current instruction */
 inline int16_t get_op_2bytes(int8_t byte_offset) {
     // TODO i would assume this doesn't require an argument; to update
+    // TODO rename in get address? see where this is used to check
     // TODO check if this is correct at some point;
-    int16_t ret = memory[program_counter + byte_offset];
-    return (ret << 8) | memory[program_counter + byte_offset + 1];
+    int16_t ret = memory[program_counter + byte_offset + 1];
+    return (ret << 8) | memory[program_counter + byte_offset];
 }
 
 /* nop */
@@ -917,6 +919,85 @@ static inline void dcx_sp() {
     stack_pointer -= 1;
 }
 
+/* jumps */
+
+static inline void jmp() {
+    int16_t addr = get_op_2bytes(1);
+    program_counter = addr;
+}
+
+/* jump if the zero bit is not set */
+static inline void jnz() {
+    update_flags_non_ac();
+    if (!regs.zf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the zero bit is set */
+static inline void jz() {
+    update_flags_non_ac();
+    if (regs.zf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the carry bit is not set */
+static inline void jnc() {
+    update_flags_non_ac();
+    if (!regs.cf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the carry bit is set */
+static inline void jc() {
+    update_flags_non_ac();
+    if (regs.cf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the parity bit is not set - odd */
+static inline void jpo() {
+    update_flags_non_ac();
+    if (!regs.pa) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the parity bit is set - even */
+static inline void jpe() {
+    update_flags_non_ac();
+    if (regs.pa) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the sign bit is not set - plus */
+static inline void jp() {
+    update_flags_non_ac();
+    if (!regs.sf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
+/* jump if the sign bit is set - minus */
+static inline void jm() {
+    update_flags_non_ac();
+    if (regs.sf) {
+        int16_t addr = get_op_2bytes(1);
+        program_counter = addr;
+    }
+}
+
 /* TODO have this in a sepparate file, so all operation
  * implementations are isolated */
 
@@ -1115,23 +1196,23 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &cmp_a}, // CMP_A
     {1,  11,5, OP_MISC}, // RNZ
     {1, 10, 0, &pop_b}, // POP_B
-    {3, 10, 0, OP_MISC}, // JNZ_A16
-    {3, 10, 0, OP_MISC}, // JMP_A16
+    {3, 10, 0, &jnz}, // JNZ_A16
+    {3, 10, 0, &jmp}, // JMP_A16
     {3, 17,11, OP_MISC}, // CNZ_A16
     {1, 11, 0, &push_b}, // PUSH_B
     {2,  7, 0, &adi}, // ADI_D8
     {1, 11, 0, OP_MISC}, // RST_0
     {1, 11, 5, OP_MISC}, // RZ
     {1, 10, 0, OP_MISC}, // RET
-    {3, 10, 0, OP_MISC}, // JZ_A16
-    {3, 10, 0, OP_MISC}, // JMP_A16_DUP_0
+    {3, 10, 0, &jz}, // JZ_A16
+    {3, 10, 0, &jmp}, // JMP_A16_DUP_0
     {3, 17,11, OP_MISC}, // CZ
     {3, 17, 0, OP_MISC}, // CALL_A16
     {2,  7, 0, &aci}, // ACI_D8
     {1, 11, 0, OP_MISC}, // RST_1
     {1, 11, 5, OP_MISC}, // RNC
     {1, 10, 0, &pop_d}, // POP_D
-    {3, 10, 0, OP_MISC}, // JNC_A16
+    {3, 10, 0, &jnc}, // JNC_A16
     {2, 10, 0, OP_MISC}, // OUT_D8
     {3, 17,11, OP_MISC}, // CNC_A16
     {1, 11, 0, &push_d}, // PUSH_D
@@ -1139,7 +1220,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, OP_MISC}, // RST_2
     {1,  11,5, OP_MISC}, // RC
     {1, 10, 0, OP_MISC}, // RET_DUP_0
-    {3, 10, 0, OP_MISC}, // JC_A16
+    {3, 10, 0, &jc}, // JC_A16
     {2, 10, 0, OP_MISC}, // IN_D8
     {3, 17,11, OP_MISC}, // CC_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_0
@@ -1147,7 +1228,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, OP_MISC}, // RST_3
     {1, 11, 5, OP_MISC}, // RPO
     {1, 10, 0, &pop_h}, // POP_H
-    {3, 10, 0, OP_MISC}, // JPO_A16
+    {3, 10, 0, &jpo}, // JPO_A16
     {1, 18, 0, &xthl}, // XTHL
     {3, 17,11, OP_MISC}, // CPO_A16
     {1, 11, 0, &push_h}, // PUSH_H
@@ -1155,7 +1236,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, OP_MISC}, // RST_4
     {1, 11, 5, OP_MISC}, // RPE
     {1,  5, 0, &pchl}, // PCHL
-    {3, 10, 0, OP_MISC}, // JPE_A16
+    {3, 10, 0, &jpe}, // JPE_A16
     {1,  5, 0, &xchg}, // XCHG
     {3, 17,11, OP_MISC}, // CPE_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_1
@@ -1163,7 +1244,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, OP_MISC}, // RST_5
     {1, 11, 5, OP_MISC}, // RP
     {1, 10, 0, &pop_psw}, // POP_PSW
-    {3, 10, 0, OP_MISC}, // JP_A16
+    {3, 10, 0, &jp}, // JP_A16
     {1,  4, 0, OP_MISC}, // DI
     {3, 17,11, OP_MISC}, // CP_A16
     {1, 11, 0, &push_psw}, // PUSH_PSW
@@ -1171,7 +1252,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, OP_MISC}, // RST_6
     {1,  11,5, OP_MISC}, // RM
     {1,  5, 0, &sphl}, // SPHL
-    {3, 10, 0, OP_MISC}, // JM_A16
+    {3, 10, 0, &jm}, // JM_A16
     {1,  4, 0, OP_MISC}, // EI
     {3, 17,11, OP_MISC}, // CM_A16
     {3, 17, 0, OP_MISC}, // CALL_A16_DUP_2
