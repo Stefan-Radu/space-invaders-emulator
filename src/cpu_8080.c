@@ -76,7 +76,7 @@ static registers regs;
 
 // ============ INSTRUCTIONS ============
 
-/* return the byte_offset'th byte from the current instruction */
+/* get the byte_offset'th byte from the current instruction */
 inline int8_t get_op_byte(int8_t byte_offset) {
     // TODO check if this is correct at some point;
     // TODO check if this needs offset
@@ -84,13 +84,11 @@ inline int8_t get_op_byte(int8_t byte_offset) {
     return memory[program_counter + byte_offset];
 }
 
-/* return the byte_cnt'th byte from the current instruction */
-inline int16_t get_op_2bytes(int8_t byte_offset) {
-    // TODO i would assume this doesn't require an argument; to update
-    // TODO rename in get address? see where this is used to check
+/* get the address from the current instruction */
+inline int16_t get_op_address() {
     // TODO check if this is correct at some point;
-    int16_t ret = memory[program_counter + byte_offset + 1];
-    return (ret << 8) | memory[program_counter + byte_offset];
+    int16_t ret = memory[program_counter + 1];
+    return (ret << 8) | memory[program_counter];
 }
 
 /* nop */
@@ -256,7 +254,7 @@ static inline void ldax_d() {
 }
 
 static inline void lda() {
-    regs.A = memory[get_op_2bytes(1)];
+    regs.A = memory[get_op_address()];
 }
 
 /* ======================== sta ============================= */
@@ -272,7 +270,7 @@ static inline void stax_d() {
 }
 
 static inline void sta() {
-    memory[get_op_2bytes(1)] = regs.A;
+    memory[get_op_address()] = regs.A;
 }
 
 /* ========================================================== */
@@ -281,14 +279,14 @@ static inline void sta() {
 
 /* store in LH 16 bits from the current op */
 static inline void lhld() {
-    int16_t addr = get_op_2bytes(1);
+    int16_t addr = get_op_address();
     regs.L = memory[addr];
     regs.H = memory[addr + 1];
 }
 
 /* store LH as 16 bits data at address */
 static inline void shld() {
-    int16_t addr = get_op_2bytes(1);
+    int16_t addr = get_op_address();
     memory[addr]     = regs.L;
     memory[addr + 1] = regs.H;
 }
@@ -297,17 +295,17 @@ static inline void shld() {
 
 static inline void lxi_b() {
     // TODO to check byte order
-    regs.BC = get_op_2bytes(1);
+    regs.BC = get_op_address();
 }
 
 static inline void lxi_d() {
     // TODO to check byte order
-    regs.DE = get_op_2bytes(1);
+    regs.DE = get_op_address();
 }
 
 static inline void lxi_h() {
     // TODO to check byte order
-    regs.HL = get_op_2bytes(1);
+    regs.HL = get_op_address();
 }
 
 static inline void lxi_sp() {
@@ -318,54 +316,52 @@ static inline void lxi_sp() {
 
 /* push big register onto the stack; reverse of pop */
 
-static inline void push_b() {
-    memory[stack_pointer - 2] = regs.C;
-    memory[stack_pointer - 1] = regs.B;
+/* TODO check if I'm pushing correctly and if the registers are ordered correctly */
+static inline void push(int16_t what) {
+    memory[stack_pointer - 2] = what & 255; // low bits
+    memory[stack_pointer - 1] = (what >> 8); // high bits
     stack_pointer -= 2;
+}
+
+static inline void push_b() {
+    push(regs.BC);
 }
 
 static inline void push_d() {
-    memory[stack_pointer - 2] = regs.E;
-    memory[stack_pointer - 1] = regs.D;
-    stack_pointer -= 2;
+    push(regs.DE);
 }
 
 static inline void push_h() {
-    memory[stack_pointer - 2] = regs.L;
-    memory[stack_pointer - 1] = regs.H;
-    stack_pointer -= 2;
+    push(regs.HL);
 }
 
 static inline void push_psw() {
-    memory[stack_pointer - 2] = regs.F;
-    memory[stack_pointer - 1] = regs.A;
-    stack_pointer -= 2;
+    push(regs.PSW);
 }
 
 /* pop 16 bits from the stack into big register; reverse of push */
 
-static inline void pop_b() {
-    regs.C = memory[stack_pointer];
-    regs.B = memory[stack_pointer + 1];
+/* TODO check if B is the high bit */
+static inline void pop(uint16_t* where) {
+    *where = (memory[stack_pointer + 1] << 8) 
+        | memory[stack_pointer];
     stack_pointer += 2;
+}
+
+static inline void pop_b() {
+    pop(&regs.BC);
 }
 
 static inline void pop_d() {
-    regs.E = memory[stack_pointer];
-    regs.D = memory[stack_pointer + 1];
-    stack_pointer += 2;
+    pop(&regs.DE);
 }
 
 static inline void pop_h() {
-    regs.L = memory[stack_pointer];
-    regs.H = memory[stack_pointer + 1];
-    stack_pointer += 2;
+    pop(&regs.HL);
 }
 
 static inline void pop_psw() {
-    regs.F = memory[stack_pointer];
-    regs.A = memory[stack_pointer + 1];
-    stack_pointer += 2;
+    pop(&regs.PSW);
 }
 
 /* exchange 16bits from top of stack with HL register */
@@ -919,10 +915,12 @@ static inline void dcx_sp() {
     stack_pointer -= 1;
 }
 
-/* jumps */
+/* ========================================================== */
+/* =================== Jumps, Calls, Rets =================== */
+/* ========================================================== */
 
 static inline void jmp() {
-    int16_t addr = get_op_2bytes(1);
+    int16_t addr = get_op_address();
     program_counter = addr;
 }
 
@@ -930,7 +928,7 @@ static inline void jmp() {
 static inline void jnz() {
     update_flags_non_ac();
     if (!regs.zf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -939,7 +937,7 @@ static inline void jnz() {
 static inline void jz() {
     update_flags_non_ac();
     if (regs.zf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -948,7 +946,7 @@ static inline void jz() {
 static inline void jnc() {
     update_flags_non_ac();
     if (!regs.cf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -957,7 +955,7 @@ static inline void jnc() {
 static inline void jc() {
     update_flags_non_ac();
     if (regs.cf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -966,7 +964,7 @@ static inline void jc() {
 static inline void jpo() {
     update_flags_non_ac();
     if (!regs.pa) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -975,7 +973,7 @@ static inline void jpo() {
 static inline void jpe() {
     update_flags_non_ac();
     if (regs.pa) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -984,7 +982,7 @@ static inline void jpe() {
 static inline void jp() {
     update_flags_non_ac();
     if (!regs.sf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
     }
 }
@@ -993,8 +991,79 @@ static inline void jp() {
 static inline void jm() {
     update_flags_non_ac();
     if (regs.sf) {
-        int16_t addr = get_op_2bytes(1);
+        int16_t addr = get_op_address();
         program_counter = addr;
+    }
+}
+
+/* push address on the stack for ret and move PC */
+static inline void call() {
+    int16_t addr = get_op_address();
+    push(addr);
+    program_counter = addr;
+}
+
+/* call if carry flag is set */
+static inline void cc() {
+    update_flags_non_ac();
+    if (regs.cf) {
+        call();
+    }
+}
+
+/* call if carry flag is not set */
+static inline void cnc() {
+    update_flags_non_ac();
+    if (!regs.cf) {
+        call();
+    }
+}
+
+/* call if zero */
+static inline void cz() {
+    update_flags_non_ac();
+    if (regs.zf) {
+        call();
+    }
+}
+
+/* call if non-zero */
+static inline void cnz() {
+    update_flags_non_ac();
+    if (!regs.zf) {
+        call();
+    }
+}
+
+/* call if negative */
+static inline void cm() {
+    update_flags_non_ac();
+    if (regs.sf) {
+        call();
+    }
+}
+
+/* call if positive */
+static inline void cp() {
+    update_flags_non_ac();
+    if (!regs.sf) {
+        call();
+    }
+}
+
+/* call if parity is even */
+static inline void cpe() {
+    update_flags_non_ac();
+    if (regs.pa) {
+        call();
+    }
+}
+
+/* call if parity is odd */
+static inline void cpo() {
+    update_flags_non_ac();
+    if (!regs.pa) {
+        call();
     }
 }
 
@@ -1198,7 +1267,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 10, 0, &pop_b}, // POP_B
     {3, 10, 0, &jnz}, // JNZ_A16
     {3, 10, 0, &jmp}, // JMP_A16
-    {3, 17,11, OP_MISC}, // CNZ_A16
+    {3, 17,11, &cnz}, // CNZ_A16
     {1, 11, 0, &push_b}, // PUSH_B
     {2,  7, 0, &adi}, // ADI_D8
     {1, 11, 0, OP_MISC}, // RST_0
@@ -1206,15 +1275,15 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 10, 0, OP_MISC}, // RET
     {3, 10, 0, &jz}, // JZ_A16
     {3, 10, 0, &jmp}, // JMP_A16_DUP_0
-    {3, 17,11, OP_MISC}, // CZ
-    {3, 17, 0, OP_MISC}, // CALL_A16
+    {3, 17,11, &cz}, // CZ
+    {3, 17, 0, &call}, // CALL_A16
     {2,  7, 0, &aci}, // ACI_D8
     {1, 11, 0, OP_MISC}, // RST_1
     {1, 11, 5, OP_MISC}, // RNC
     {1, 10, 0, &pop_d}, // POP_D
     {3, 10, 0, &jnc}, // JNC_A16
     {2, 10, 0, OP_MISC}, // OUT_D8
-    {3, 17,11, OP_MISC}, // CNC_A16
+    {3, 17,11, &cnc}, // CNC_A16
     {1, 11, 0, &push_d}, // PUSH_D
     {2,  7, 0, &sui}, // SUI_D8
     {1, 11, 0, OP_MISC}, // RST_2
@@ -1222,15 +1291,15 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 10, 0, OP_MISC}, // RET_DUP_0
     {3, 10, 0, &jc}, // JC_A16
     {2, 10, 0, OP_MISC}, // IN_D8
-    {3, 17,11, OP_MISC}, // CC_A16
-    {3, 17, 0, OP_MISC}, // CALL_A16_DUP_0
+    {3, 17,11, &cc}, // CC_A16
+    {3, 17, 0, &call}, // CALL_A16_DUP_0
     {2,  7, 0, &sbi}, // SBI_D8
     {1, 11, 0, OP_MISC}, // RST_3
     {1, 11, 5, OP_MISC}, // RPO
     {1, 10, 0, &pop_h}, // POP_H
     {3, 10, 0, &jpo}, // JPO_A16
     {1, 18, 0, &xthl}, // XTHL
-    {3, 17,11, OP_MISC}, // CPO_A16
+    {3, 17,11, &cpo}, // CPO_A16
     {1, 11, 0, &push_h}, // PUSH_H
     {2,  7, 0, &ani}, // ANI_D8
     {1, 11, 0, OP_MISC}, // RST_4
@@ -1238,15 +1307,15 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, &pchl}, // PCHL
     {3, 10, 0, &jpe}, // JPE_A16
     {1,  5, 0, &xchg}, // XCHG
-    {3, 17,11, OP_MISC}, // CPE_A16
-    {3, 17, 0, OP_MISC}, // CALL_A16_DUP_1
+    {3, 17,11, &cpe}, // CPE_A16
+    {3, 17, 0, &call}, // CALL_A16_DUP_1
     {2,  7, 0, &xri}, // XRI_D8
     {1, 11, 0, OP_MISC}, // RST_5
     {1, 11, 5, OP_MISC}, // RP
     {1, 10, 0, &pop_psw}, // POP_PSW
     {3, 10, 0, &jp}, // JP_A16
     {1,  4, 0, OP_MISC}, // DI
-    {3, 17,11, OP_MISC}, // CP_A16
+    {3, 17,11, &cp}, // CP_A16
     {1, 11, 0, &push_psw}, // PUSH_PSW
     {2,  7, 0, &ori}, // ORI_D8
     {1, 11, 0, OP_MISC}, // RST_6
@@ -1254,8 +1323,8 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  5, 0, &sphl}, // SPHL
     {3, 10, 0, &jm}, // JM_A16
     {1,  4, 0, OP_MISC}, // EI
-    {3, 17,11, OP_MISC}, // CM_A16
-    {3, 17, 0, OP_MISC}, // CALL_A16_DUP_2
+    {3, 17,11, &cm}, // CM_A16
+    {3, 17, 0, &call}, // CALL_A16_DUP_2
     {2,  7, 0, &cpi}, // CPI_D8
     {1, 11, 0, OP_MISC}, // RST_7
 };
