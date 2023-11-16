@@ -394,6 +394,7 @@ static inline void xchg() {
 static inline void update_flag_ac();
 
 /* TODO seperate flag setter for all other flags */
+/* TODO maybe rename this. it's a bit confusing */
 static inline void update_flags_non_ac();
 
 static inline void update_flag_variables(int16_t operand, operation op) {
@@ -919,6 +920,7 @@ static inline void dcx_sp() {
 /* =================== Jumps, Calls, Rets =================== */
 /* ========================================================== */
 
+/* get 16-bit address from operation and move PC there */
 static inline void jmp() {
     int16_t addr = get_op_address();
     program_counter = addr;
@@ -996,7 +998,7 @@ static inline void jm() {
     }
 }
 
-/* push address on the stack for ret and move PC */
+/* push address on the stack for ret and move PC there */
 static inline void call() {
     int16_t addr = get_op_address();
     push(addr);
@@ -1064,6 +1066,77 @@ static inline void cpo() {
     update_flags_non_ac();
     if (!regs.pa) {
         call();
+    }
+}
+
+/* opposite of ret; pop address from stack and move PC there */
+static inline void ret() {
+    uint16_t addr;
+    pop(&addr);
+    program_counter = addr;
+}
+
+/* return if the carry bit is set */
+static inline void rc() {
+    update_flags_non_ac();
+    if (regs.cf) {
+        ret();
+    }
+}
+
+/* return if the carry bit is not set */
+static inline void rnc() {
+    update_flags_non_ac();
+    if (!regs.cf) {
+        ret();
+    }
+}
+
+/* return if the zero bit is set */
+static inline void rz() {
+    update_flags_non_ac();
+    if (regs.zf) {
+        ret();
+    }
+}
+
+/* return if the zero bit is not set */
+static inline void rnz() {
+    update_flags_non_ac();
+    if (!regs.zf) {
+        ret();
+    }
+}
+
+/* return if the sign bit is set - minus */
+static inline void rm() {
+    update_flags_non_ac();
+    if (regs.sf) {
+        ret();
+    }
+}
+
+/* return if the sign bit is not set - plus */
+static inline void rp() {
+    update_flags_non_ac();
+    if (!regs.sf) {
+        ret();
+    }
+}
+
+/* return if the parity bit is set - even */
+static inline void rpe() {
+    update_flags_non_ac();
+    if (regs.pa) {
+        ret();
+    }
+}
+
+/* return if the parity bit is not set - odd */
+static inline void rpo() {
+    update_flags_non_ac();
+    if (!regs.pa) {
+        ret();
     }
 }
 
@@ -1263,7 +1336,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1,  4, 0, &cmp_l}, // CMP_L
     {1,  7, 0, &cmp_m}, // CMP_M
     {1,  4, 0, &cmp_a}, // CMP_A
-    {1,  11,5, OP_MISC}, // RNZ
+    {1,  11,5, &rnz}, // RNZ
     {1, 10, 0, &pop_b}, // POP_B
     {3, 10, 0, &jnz}, // JNZ_A16
     {3, 10, 0, &jmp}, // JMP_A16
@@ -1271,15 +1344,15 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, &push_b}, // PUSH_B
     {2,  7, 0, &adi}, // ADI_D8
     {1, 11, 0, OP_MISC}, // RST_0
-    {1, 11, 5, OP_MISC}, // RZ
-    {1, 10, 0, OP_MISC}, // RET
+    {1, 11, 5, &rz}, // RZ
+    {1, 10, 0, &ret}, // RET
     {3, 10, 0, &jz}, // JZ_A16
     {3, 10, 0, &jmp}, // JMP_A16_DUP_0
     {3, 17,11, &cz}, // CZ
     {3, 17, 0, &call}, // CALL_A16
     {2,  7, 0, &aci}, // ACI_D8
     {1, 11, 0, OP_MISC}, // RST_1
-    {1, 11, 5, OP_MISC}, // RNC
+    {1, 11, 5, &rnc}, // RNC
     {1, 10, 0, &pop_d}, // POP_D
     {3, 10, 0, &jnc}, // JNC_A16
     {2, 10, 0, OP_MISC}, // OUT_D8
@@ -1287,7 +1360,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, &push_d}, // PUSH_D
     {2,  7, 0, &sui}, // SUI_D8
     {1, 11, 0, OP_MISC}, // RST_2
-    {1,  11,5, OP_MISC}, // RC
+    {1,  11,5, &rc}, // RC
     {1, 10, 0, OP_MISC}, // RET_DUP_0
     {3, 10, 0, &jc}, // JC_A16
     {2, 10, 0, OP_MISC}, // IN_D8
@@ -1295,7 +1368,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {3, 17, 0, &call}, // CALL_A16_DUP_0
     {2,  7, 0, &sbi}, // SBI_D8
     {1, 11, 0, OP_MISC}, // RST_3
-    {1, 11, 5, OP_MISC}, // RPO
+    {1, 11, 5, &rpo}, // RPO
     {1, 10, 0, &pop_h}, // POP_H
     {3, 10, 0, &jpo}, // JPO_A16
     {1, 18, 0, &xthl}, // XTHL
@@ -1303,7 +1376,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, &push_h}, // PUSH_H
     {2,  7, 0, &ani}, // ANI_D8
     {1, 11, 0, OP_MISC}, // RST_4
-    {1, 11, 5, OP_MISC}, // RPE
+    {1, 11, 5, &rpe}, // RPE
     {1,  5, 0, &pchl}, // PCHL
     {3, 10, 0, &jpe}, // JPE_A16
     {1,  5, 0, &xchg}, // XCHG
@@ -1311,7 +1384,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {3, 17, 0, &call}, // CALL_A16_DUP_1
     {2,  7, 0, &xri}, // XRI_D8
     {1, 11, 0, OP_MISC}, // RST_5
-    {1, 11, 5, OP_MISC}, // RP
+    {1, 11, 5, &rp}, // RP
     {1, 10, 0, &pop_psw}, // POP_PSW
     {3, 10, 0, &jp}, // JP_A16
     {1,  4, 0, OP_MISC}, // DI
@@ -1319,7 +1392,7 @@ op_code_detail op_code_details[OP_CODES_CNT] = {
     {1, 11, 0, &push_psw}, // PUSH_PSW
     {2,  7, 0, &ori}, // ORI_D8
     {1, 11, 0, OP_MISC}, // RST_6
-    {1,  11,5, OP_MISC}, // RM
+    {1,  11,5, &rm}, // RM
     {1,  5, 0, &sphl}, // SPHL
     {3, 10, 0, &jm}, // JM_A16
     {1,  4, 0, OP_MISC}, // EI
