@@ -74,7 +74,13 @@ typedef union {
 
 static registers regs;
 
-// ============ INSTRUCTIONS ============
+/* ============ INSTRUCTIONS ============
+
+ * references:
+ * - Intel 8080 Programmer's Manual
+ * - https://gist.github.com/joefg/634fa4a1046516d785c9
+ * - https://www.pastraiser.com/cpu/i8080/i8080_opcodes.html */
+
 
 /* get the byte_offset'th byte from the current instruction */
 inline int8_t get_op_byte(int8_t byte_offset) {
@@ -245,15 +251,15 @@ static inline void mvi_a(void) {
 
 /* load value at address into register A */
 
-static inline void ldax_b() {
+static inline void ldax_b(void) {
     regs.A = memory[regs.BC];
 }
 
-static inline void ldax_d() {
+static inline void ldax_d(void) {
     regs.A = memory[regs.DE];
 }
 
-static inline void lda() {
+static inline void lda(void) {
     regs.A = memory[get_op_address()];
 }
 
@@ -261,15 +267,15 @@ static inline void lda() {
 
 /* store value from register A at address */
 
-static inline void stax_b() {
+static inline void stax_b(void) {
     memory[regs.BC] = regs.A;
 }
 
-static inline void stax_d() {
+static inline void stax_d(void) {
     memory[regs.DE] = regs.A;
 }
 
-static inline void sta() {
+static inline void sta(void) {
     memory[get_op_address()] = regs.A;
 }
 
@@ -278,14 +284,14 @@ static inline void sta() {
 /* ========================================================== */
 
 /* store in LH 16 bits from the current op */
-static inline void lhld() {
+static inline void lhld(void) {
     int16_t addr = get_op_address();
     regs.L = memory[addr];
     regs.H = memory[addr + 1];
 }
 
 /* store LH as 16 bits data at address */
-static inline void shld() {
+static inline void shld(void) {
     int16_t addr = get_op_address();
     memory[addr]     = regs.L;
     memory[addr + 1] = regs.H;
@@ -293,22 +299,22 @@ static inline void shld() {
 
 /* Load 16 bits from the current op big regsiters / SP */
 
-static inline void lxi_b() {
+static inline void lxi_b(void) {
     // TODO to check byte order
     regs.BC = get_op_address();
 }
 
-static inline void lxi_d() {
+static inline void lxi_d(void) {
     // TODO to check byte order
     regs.DE = get_op_address();
 }
 
-static inline void lxi_h() {
+static inline void lxi_h(void) {
     // TODO to check byte order
     regs.HL = get_op_address();
 }
 
-static inline void lxi_sp() {
+static inline void lxi_sp(void) {
     // TODO to check byte order
     stack_pointer = (get_op_byte(2) << 8)
         | get_op_byte(1);
@@ -323,19 +329,19 @@ static inline void push(int16_t what) {
     stack_pointer -= 2;
 }
 
-static inline void push_b() {
+static inline void push_b(void) {
     push(regs.BC);
 }
 
-static inline void push_d() {
+static inline void push_d(void) {
     push(regs.DE);
 }
 
-static inline void push_h() {
+static inline void push_h(void) {
     push(regs.HL);
 }
 
-static inline void push_psw() {
+static inline void push_psw(void) {
     push(regs.PSW);
 }
 
@@ -348,41 +354,41 @@ static inline void pop(uint16_t* where) {
     stack_pointer += 2;
 }
 
-static inline void pop_b() {
+static inline void pop_b(void) {
     pop(&regs.BC);
 }
 
-static inline void pop_d() {
+static inline void pop_d(void) {
     pop(&regs.DE);
 }
 
-static inline void pop_h() {
+static inline void pop_h(void) {
     pop(&regs.HL);
 }
 
-static inline void pop_psw() {
+static inline void pop_psw(void) {
     pop(&regs.PSW);
 }
 
 /* exchange 16bits from top of stack with HL register */
 
-static inline void xthl() {
+static inline void xthl(void) {
     swap(regs.L, memory[stack_pointer]);
     swap(regs.H, memory[stack_pointer + 1]);
 }
 
-static inline void sphl() {
+static inline void sphl(void) {
     // TODO check that the byte order is as expected
     stack_pointer = regs.HL;
 }
 
 /* equivalent with jmp HL */
-static inline void pchl() {
+static inline void pchl(void) {
     // TODO check that the byte order is as expected
     program_counter = regs.HL;
 }
 
-static inline void xchg() {
+static inline void xchg(void) {
     swap(regs.HL, regs.DE);
 }
 
@@ -391,11 +397,12 @@ static inline void xchg() {
 /* ========================================================== */
 
 /* TODO seperate flag setter for AC --> this is only used in DAA */
-static inline void update_flag_ac();
+/* TODO these functions need better names */
+static inline void update_flag_ac(void);
 
 /* TODO seperate flag setter for all other flags */
 /* TODO maybe rename this. it's a bit confusing */
-static inline void update_flags_non_ac();
+static inline void update_flags_non_ac(void);
 
 static inline void update_flag_variables(int16_t operand, operation op) {
     last_acc = regs.A;
@@ -414,31 +421,31 @@ static inline void add(int8_t operand) {
     regs.A += operand;
 }
 
-static inline void add_b() {
+static inline void add_b(void) {
     add(regs.B);
 }
 
-static inline void add_c() {
+static inline void add_c(void) {
     add(regs.C);
 }
 
-static inline void add_d() {
+static inline void add_d(void) {
     add(regs.D);
 }
 
-static inline void add_e() {
+static inline void add_e(void) {
     add(regs.E);
 }
 
-static inline void add_h() {
+static inline void add_h(void) {
     add(regs.H);
 }
 
-static inline void add_m() {
+static inline void add_m(void) {
     add(memory[regs.HL]);
 }
 
-static inline void add_a() {
+static inline void add_a(void) {
     add(regs.A);
 }
 
@@ -451,31 +458,31 @@ static inline void sub(int8_t operand) {
     regs.A -= operand;
 }
 
-static inline void sub_b() {
+static inline void sub_b(void) {
     sub(regs.B);
 }
 
-static inline void sub_c() {
+static inline void sub_c(void) {
     sub(regs.C);
 }
 
-static inline void sub_d() {
+static inline void sub_d(void) {
     sub(regs.D);
 }
 
-static inline void sub_e() {
+static inline void sub_e(void) {
     sub(regs.E);
 }
 
-static inline void sub_h() {
+static inline void sub_h(void) {
     sub(regs.H);
 }
 
-static inline void sub_m() {
+static inline void sub_m(void) {
     sub(memory[regs.HL]);
 }
 
-static inline void sub_a() {
+static inline void sub_a(void) {
     sub(regs.A);
 }
 
@@ -486,35 +493,35 @@ static inline void inr(uint8_t *r) {
     *r += 1;
 }
 
-static inline void inr_b() {
+static inline void inr_b(void) {
     inr(&regs.B);
 }
 
-static inline void inr_c() {
+static inline void inr_c(void) {
     inr(&regs.C);
 }
 
-static inline void inr_d() {
+static inline void inr_d(void) {
     inr(&regs.D);
 }
 
-static inline void inr_e() {
+static inline void inr_e(void) {
     inr(&regs.E);
 }
 
-static inline void inr_h() {
+static inline void inr_h(void) {
     inr(&regs.H);
 }
 
-static inline void inr_l() {
+static inline void inr_l(void) {
     inr(&regs.L);
 }
 
-static inline void inr_m() {
+static inline void inr_m(void) {
     inr(&memory[regs.HL]);
 }
 
-static inline void inr_a() {
+static inline void inr_a(void) {
     inr(&regs.A);
 }
 
@@ -525,35 +532,35 @@ static inline void dcr(uint8_t *r) {
     *r -= 1;
 }
 
-static inline void dcr_b() {
+static inline void dcr_b(void) {
     dcr(&regs.B);
 }
 
-static inline void dcr_c() {
+static inline void dcr_c(void) {
     dcr(&regs.C);
 }
 
-static inline void dcr_d() {
+static inline void dcr_d(void) {
     dcr(&regs.D);
 }
 
-static inline void dcr_e() {
+static inline void dcr_e(void) {
     dcr(&regs.E);
 }
 
-static inline void dcr_h() {
+static inline void dcr_h(void) {
     dcr(&regs.H);
 }
 
-static inline void dcr_l() {
+static inline void dcr_l(void) {
     dcr(&regs.L);
 }
 
-static inline void dcr_m() {
+static inline void dcr_m(void) {
     dcr(&memory[regs.HL]);
 }
 
-static inline void dcr_a() {
+static inline void dcr_a(void) {
     dcr(&regs.A);
 }
 
@@ -563,35 +570,35 @@ static inline void cmp(uint8_t value) {
     update_flag_variables(value, CMP8); 
 }
 
-static inline void cmp_b() {
+static inline void cmp_b(void) {
     cmp(regs.B);
 }
 
-static inline void cmp_c() {
+static inline void cmp_c(void) {
     cmp(regs.C);
 }
 
-static inline void cmp_d() {
+static inline void cmp_d(void) {
     cmp(regs.D);
 }
 
-static inline void cmp_e() {
+static inline void cmp_e(void) {
     cmp(regs.E);
 }
 
-static inline void cmp_h() {
+static inline void cmp_h(void) {
     cmp(regs.H);
 }
 
-static inline void cmp_l() {
+static inline void cmp_l(void) {
     cmp(regs.L);
 }
 
-static inline void cmp_m() {
+static inline void cmp_m(void) {
     cmp(memory[regs.HL]);
 }
 
-static inline void cmp_a() {
+static inline void cmp_a(void) {
     cmp(regs.A);
 }
 
@@ -602,35 +609,35 @@ static inline void ana(int8_t val) {
     update_flag_variables(val, AND8);
 }
 
-static inline void ana_b() {
+static inline void ana_b(void) {
     ana(regs.B);
 }
 
-static inline void ana_c() {
+static inline void ana_c(void) {
     ana(regs.C);
 }
 
-static inline void ana_d() {
+static inline void ana_d(void) {
     ana(regs.D);
 }
 
-static inline void ana_e() {
+static inline void ana_e(void) {
     ana(regs.E);
 }
 
-static inline void ana_h() {
+static inline void ana_h(void) {
     ana(regs.H);
 }
 
-static inline void ana_l() {
+static inline void ana_l(void) {
     ana(regs.L);
 }
 
-static inline void ana_m() {
+static inline void ana_m(void) {
     ana(memory[regs.HL]);
 }
 
-static inline void ana_a() {
+static inline void ana_a(void) {
     ana(regs.A);
 }
 
@@ -641,35 +648,35 @@ static inline void ora(int8_t val) {
     update_flag_variables(val, OR8);
 }
 
-static inline void ora_b() {
+static inline void ora_b(void) {
     ora(regs.B);
 }
 
-static inline void ora_c() {
+static inline void ora_c(void) {
     ora(regs.C);
 }
 
-static inline void ora_d() {
+static inline void ora_d(void) {
     ora(regs.D);
 }
 
-static inline void ora_e() {
+static inline void ora_e(void) {
     ora(regs.E);
 }
 
-static inline void ora_h() {
+static inline void ora_h(void) {
     ora(regs.H);
 }
 
-static inline void ora_l() {
+static inline void ora_l(void) {
     ora(regs.L);
 }
 
-static inline void ora_m() {
+static inline void ora_m(void) {
     ora(memory[regs.HL]);
 }
 
-static inline void ora_a() {
+static inline void ora_a(void) {
     ora(regs.A);
 }
 
@@ -680,77 +687,77 @@ static inline void xra(int8_t val) {
     update_flag_variables(val, XOR8);
 }
 
-static inline void xra_b() {
+static inline void xra_b(void) {
     xra(regs.B);
 }
 
-static inline void xra_c() {
+static inline void xra_c(void) {
     xra(regs.C);
 }
 
-static inline void xra_d() {
+static inline void xra_d(void) {
     xra(regs.D);
 }
 
-static inline void xra_e() {
+static inline void xra_e(void) {
     xra(regs.E);
 }
 
-static inline void xra_h() {
+static inline void xra_h(void) {
     xra(regs.H);
 }
 
-static inline void xra_l() {
+static inline void xra_l(void) {
     xra(regs.L);
 }
 
-static inline void xra_m() {
+static inline void xra_m(void) {
     xra(memory[regs.HL]);
 }
 
-static inline void xra_a() {
+static inline void xra_a(void) {
     xra(regs.A);
 }
 
 /* immediate 8-bit arithmetic operations */
 
-static inline void adi() {
+static inline void adi(void) {
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, ADD8);
     regs.A += operand;
 }
 
-static inline void sui() {
+static inline void sui(void) {
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, SUB8);
     regs.A -= operand;
 }
 
-static inline void cpi() {
+static inline void cpi(void) {
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, CMP8);
 }
 
-static inline void ani() {
+static inline void ani(void) {
     // TODO correct upstream typo (https://gist.github.com/joefg/634fa4a1046516d785c9#file-8080-op-L52)
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, AND8);
     regs.A &= operand;
 }
 
-static inline void ori() {
+static inline void ori(void) {
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, OR8);
     regs.A |= operand;
 }
 
-static inline void xri() {
+static inline void xri(void) {
     int8_t operand = get_op_byte(1);
     update_flag_variables(operand, XOR8);
     regs.A ^= operand;
 }
 
-static inline void daa() {
+static inline void daa(void) {
     /* TODO */
 }
 
@@ -763,41 +770,41 @@ static inline void adc(int8_t operand) {
     regs.A += operand + regs.cf;
 }
 
-static inline void adc_b() {
+static inline void adc_b(void) {
     adc(regs.B);
 }
 
-static inline void adc_c() {
+static inline void adc_c(void) {
     adc(regs.C);
 }
 
-static inline void adc_d() {
+static inline void adc_d(void) {
     adc(regs.D);
 }
 
-static inline void adc_e() {
+static inline void adc_e(void) {
     adc(regs.E);
 }
 
-static inline void adc_h() {
+static inline void adc_h(void) {
     adc(regs.H);
 }
 
-static inline void adc_l() {
+static inline void adc_l(void) {
     adc(regs.L);
 }
 
-static inline void adc_m() {
+static inline void adc_m(void) {
     adc(memory[regs.HL]);
 }
 
-static inline void adc_a() {
+static inline void adc_a(void) {
     adc(regs.A);
 }
 
 /* add immediate value to accumulator with carry - affects C, S, Z, P, AC */
 
-static inline void aci() {
+static inline void aci(void) {
     int8_t value = get_op_byte(1);
     update_flags_non_ac();
     update_flag_variables(value, ADC);
@@ -812,41 +819,41 @@ static inline void sbb(int8_t operand) {
     regs.A -= (operand + regs.cf);
 }
 
-static inline void sbb_b() {
+static inline void sbb_b(void) {
     sbb(regs.B);
 }
 
-static inline void sbb_c() {
+static inline void sbb_c(void) {
     sbb(regs.C);
 }
 
-static inline void sbb_d() {
+static inline void sbb_d(void) {
     sbb(regs.D);
 }
 
-static inline void sbb_e() {
+static inline void sbb_e(void) {
     sbb(regs.E);
 }
 
-static inline void sbb_h() {
+static inline void sbb_h(void) {
     sbb(regs.H);
 }
 
-static inline void sbb_l() {
+static inline void sbb_l(void) {
     sbb(regs.L);
 }
 
-static inline void sbb_m() {
+static inline void sbb_m(void) {
     sbb(memory[regs.HL]);
 }
 
-static inline void sbb_a() {
+static inline void sbb_a(void) {
     sbb(regs.A);
 }
 
 /* subtract immediate value from accumulator with carry - affects C, S, Z, P, AC */
 
-static inline void sbi() {
+static inline void sbi(void) {
     int8_t value = get_op_byte(1);
     update_flags_non_ac();
     update_flag_variables(value, SBB);
@@ -864,55 +871,55 @@ static inline void dad(int16_t operand) {
     regs.HL += operand;
 }
 
-static inline void dad_b() {
+static inline void dad_b(void) {
     dad(regs.BC);
 }
 
-static inline void dad_d() {
+static inline void dad_d(void) {
     dad(regs.DE);
 }
 
-static inline void dad_h() {
+static inline void dad_h(void) {
     dad(regs.HL);
 }
 
-static inline void dad_sp() {
+static inline void dad_sp(void) {
     dad(stack_pointer);
 }
 
 /* increments register-pair by 1 */
 
-static inline void inx_b() {
+static inline void inx_b(void) {
     regs.BC += 1;
 }
 
-static inline void inx_d() {
+static inline void inx_d(void) {
     regs.DE += 1;
 }
 
-static inline void inx_h() {
+static inline void inx_h(void) {
     regs.HL += 1;
 }
 
-static inline void inx_sp() {
+static inline void inx_sp(void) {
     stack_pointer += 1;
 }
 
 /* decrements register-pair by 1 */
 
-static inline void dcx_b() {
+static inline void dcx_b(void) {
     regs.BC -= 1;
 }
 
-static inline void dcx_d() {
+static inline void dcx_d(void) {
     regs.DE -= 1;
 }
 
-static inline void dcx_h() {
+static inline void dcx_h(void) {
     regs.HL -= 1;
 }
 
-static inline void dcx_sp() {
+static inline void dcx_sp(void) {
     stack_pointer -= 1;
 }
 
@@ -921,13 +928,13 @@ static inline void dcx_sp() {
 /* ========================================================== */
 
 /* get 16-bit address from operation and move PC there */
-static inline void jmp() {
+static inline void jmp(void) {
     int16_t addr = get_op_address();
     program_counter = addr;
 }
 
 /* jump if the zero bit is not set */
-static inline void jnz() {
+static inline void jnz(void) {
     update_flags_non_ac();
     if (!regs.zf) {
         int16_t addr = get_op_address();
@@ -936,7 +943,7 @@ static inline void jnz() {
 }
 
 /* jump if the zero bit is set */
-static inline void jz() {
+static inline void jz(void) {
     update_flags_non_ac();
     if (regs.zf) {
         int16_t addr = get_op_address();
@@ -945,7 +952,7 @@ static inline void jz() {
 }
 
 /* jump if the carry bit is not set */
-static inline void jnc() {
+static inline void jnc(void) {
     update_flags_non_ac();
     if (!regs.cf) {
         int16_t addr = get_op_address();
@@ -954,7 +961,7 @@ static inline void jnc() {
 }
 
 /* jump if the carry bit is set */
-static inline void jc() {
+static inline void jc(void) {
     update_flags_non_ac();
     if (regs.cf) {
         int16_t addr = get_op_address();
@@ -963,7 +970,7 @@ static inline void jc() {
 }
 
 /* jump if the parity bit is not set - odd */
-static inline void jpo() {
+static inline void jpo(void) {
     update_flags_non_ac();
     if (!regs.pa) {
         int16_t addr = get_op_address();
@@ -972,7 +979,7 @@ static inline void jpo() {
 }
 
 /* jump if the parity bit is set - even */
-static inline void jpe() {
+static inline void jpe(void) {
     update_flags_non_ac();
     if (regs.pa) {
         int16_t addr = get_op_address();
@@ -981,7 +988,7 @@ static inline void jpe() {
 }
 
 /* jump if the sign bit is not set - plus */
-static inline void jp() {
+static inline void jp(void) {
     update_flags_non_ac();
     if (!regs.sf) {
         int16_t addr = get_op_address();
@@ -990,7 +997,7 @@ static inline void jp() {
 }
 
 /* jump if the sign bit is set - minus */
-static inline void jm() {
+static inline void jm(void) {
     update_flags_non_ac();
     if (regs.sf) {
         int16_t addr = get_op_address();
@@ -999,14 +1006,14 @@ static inline void jm() {
 }
 
 /* push address on the stack for ret and move PC there */
-static inline void call() {
+static inline void call(void) {
     int16_t addr = get_op_address();
     push(addr);
     program_counter = addr;
 }
 
 /* call if carry flag is set */
-static inline void cc() {
+static inline void cc(void) {
     update_flags_non_ac();
     if (regs.cf) {
         call();
@@ -1014,7 +1021,7 @@ static inline void cc() {
 }
 
 /* call if carry flag is not set */
-static inline void cnc() {
+static inline void cnc(void) {
     update_flags_non_ac();
     if (!regs.cf) {
         call();
@@ -1022,7 +1029,7 @@ static inline void cnc() {
 }
 
 /* call if zero */
-static inline void cz() {
+static inline void cz(void) {
     update_flags_non_ac();
     if (regs.zf) {
         call();
@@ -1030,7 +1037,7 @@ static inline void cz() {
 }
 
 /* call if non-zero */
-static inline void cnz() {
+static inline void cnz(void) {
     update_flags_non_ac();
     if (!regs.zf) {
         call();
@@ -1038,7 +1045,7 @@ static inline void cnz() {
 }
 
 /* call if negative */
-static inline void cm() {
+static inline void cm(void) {
     update_flags_non_ac();
     if (regs.sf) {
         call();
@@ -1046,7 +1053,7 @@ static inline void cm() {
 }
 
 /* call if positive */
-static inline void cp() {
+static inline void cp(void) {
     update_flags_non_ac();
     if (!regs.sf) {
         call();
@@ -1054,7 +1061,7 @@ static inline void cp() {
 }
 
 /* call if parity is even */
-static inline void cpe() {
+static inline void cpe(void) {
     update_flags_non_ac();
     if (regs.pa) {
         call();
@@ -1062,7 +1069,7 @@ static inline void cpe() {
 }
 
 /* call if parity is odd */
-static inline void cpo() {
+static inline void cpo(void) {
     update_flags_non_ac();
     if (!regs.pa) {
         call();
@@ -1070,14 +1077,14 @@ static inline void cpo() {
 }
 
 /* opposite of ret; pop address from stack and move PC there */
-static inline void ret() {
+static inline void ret(void) {
     uint16_t addr;
     pop(&addr);
     program_counter = addr;
 }
 
 /* return if the carry bit is set */
-static inline void rc() {
+static inline void rc(void) {
     update_flags_non_ac();
     if (regs.cf) {
         ret();
@@ -1085,7 +1092,7 @@ static inline void rc() {
 }
 
 /* return if the carry bit is not set */
-static inline void rnc() {
+static inline void rnc(void) {
     update_flags_non_ac();
     if (!regs.cf) {
         ret();
@@ -1093,7 +1100,7 @@ static inline void rnc() {
 }
 
 /* return if the zero bit is set */
-static inline void rz() {
+static inline void rz(void) {
     update_flags_non_ac();
     if (regs.zf) {
         ret();
@@ -1101,7 +1108,7 @@ static inline void rz() {
 }
 
 /* return if the zero bit is not set */
-static inline void rnz() {
+static inline void rnz(void) {
     update_flags_non_ac();
     if (!regs.zf) {
         ret();
@@ -1109,7 +1116,7 @@ static inline void rnz() {
 }
 
 /* return if the sign bit is set - minus */
-static inline void rm() {
+static inline void rm(void) {
     update_flags_non_ac();
     if (regs.sf) {
         ret();
@@ -1117,7 +1124,7 @@ static inline void rm() {
 }
 
 /* return if the sign bit is not set - plus */
-static inline void rp() {
+static inline void rp(void) {
     update_flags_non_ac();
     if (!regs.sf) {
         ret();
@@ -1125,7 +1132,7 @@ static inline void rp() {
 }
 
 /* return if the parity bit is set - even */
-static inline void rpe() {
+static inline void rpe(void) {
     update_flags_non_ac();
     if (regs.pa) {
         ret();
@@ -1133,11 +1140,45 @@ static inline void rpe() {
 }
 
 /* return if the parity bit is not set - odd */
-static inline void rpo() {
+static inline void rpo(void) {
     update_flags_non_ac();
     if (!regs.pa) {
         ret();
     }
+}
+
+/* ========================================================== */
+/* ======================== Rotations ======================= */
+/* ========================================================== */
+
+/* rotate accumulator left throught CF */
+static inline void ral(void) {
+    update_flags_non_ac();
+    uint8_t old_cf = regs.cf;
+    regs.cf = regs.A & (1 << 7);
+    regs.A = (regs.A << 1) | old_cf;
+}
+
+/* rotate accumulator right throught CF */
+static inline void rar(void) {
+    update_flags_non_ac();
+    uint8_t old_lb = regs.A & 1;
+    regs.A = (regs.A >> 1) | (regs.cf << 7);
+    regs.cf = old_lb;
+}
+
+/* rotate accumulator left; CF becomes higher order bit */
+static inline void rlc(void) {
+    update_flags_non_ac();
+    regs.cf = regs.A & (1 << 7);
+    regs.A = (regs.A << 1) | (regs.A & (1 << 7));
+}
+
+/* rotate accumulator right; CF becomes lower order bit */
+static inline void rrc(void) {
+    update_flags_non_ac();
+    regs.cf = regs.A & 1;
+    regs.A = (regs.A >> 1) | ((regs.A & 1) << 7);
 }
 
 /* TODO have this in a sepparate file, so all operation
